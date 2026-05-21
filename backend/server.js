@@ -17,7 +17,7 @@ const MongoStore = require("connect-mongo");
 const rateLimit = require("express-rate-limit");
 const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const CloudinaryStorage = require("multer-storage-cloudinary");
 require("dotenv").config();
 
 const app = express();
