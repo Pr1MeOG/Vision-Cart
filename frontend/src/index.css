@@ -433,15 +433,6 @@ a { color: var(--pink2); }
 .upi-id { color: var(--text-muted); margin-bottom: 6px; font-size: 0.9rem; }
 .upi-hint { color: var(--text-muted); font-size: 0.82rem; margin-bottom: 22px; }
 
-/* ─── ADMIN AUTH ─────────────────────────────────────────── */
-.admin-auth-modal { text-align: center; max-width: 360px; }
-.admin-auth-modal h2 { font-family: 'Syne', sans-serif; font-size: 1.5rem; margin-bottom: 22px; }
-.admin-auth-modal input {
-  width: 100%; background: rgba(255,255,255,0.04); border: 1px solid var(--border);
-  color: var(--text); padding: 13px 16px; border-radius: 12px; font-size: 0.95rem; margin-bottom: 12px;
-}
-.admin-auth-modal input:focus { outline: none; border-color: var(--purple); }
-
 /* ─── ADMIN PANEL ───────────────────────────────────────── */
 .admin-overlay { position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,0.6); }
 .admin-panel {

@@ -1,5 +1,23 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Component } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+
+const safeArr = (v) => Array.isArray(v) ? v : [];
+
+class AdminErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(e) { return { error: e }; }
+  componentDidCatch(e, info) { console.error("AdminPanel crash:", e, info); }
+  render() {
+    if (this.state.error) return (
+      <div className="app" style={{ padding: 40, textAlign: "center" }}>
+        <div style={{ color: "#f87171", fontSize: "1.2rem", marginBottom: 16 }}>⚠️ Admin Panel crashed</div>
+        <div style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginBottom: 20 }}>{this.state.error.message}</div>
+        <button className="btn-primary" onClick={() => { this.setState({ error: null }); window.location.reload(); }}>Reload Page</button>
+      </div>
+    );
+    return this.props.children;
+  }
+}
 
 // ─── SVG ICONS ─────────────────────────────────────────────
 const Icon = ({ name, size = 20, ...props }) => {
@@ -389,53 +407,37 @@ const UPIModal = ({ amount, orderId, user, onClose, onReceiptGenerated }) => {
   );
 };
 
-// ─── ADMIN AUTH ───────────────────────────────────────────
-const AdminAuthModal = ({ onClose, onVerified }) => {
-  const [pass, setPass] = useState(""); const [error, setError] = useState(""); const [loading, setLoading] = useState(false);
-  const verify = async () => {
-    setLoading(true); setError("");
-    const data = await api("/auth/verify-admin", { method: "POST", body: JSON.stringify({ password: pass }) });
-    setLoading(false);
-    if (data.ok) { onVerified(); onClose(); }
-    else setError(data.message || "Wrong admin password!");
-  };
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <motion.div className="modal admin-auth-modal" onClick={e => e.stopPropagation()} initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}>
-        <div className="modal-glow" />
-        <button className="modal-close" onClick={onClose}><Icon name="close" size={14} /></button>
-        <h2>🔐 Admin Access</h2>
-        <input type="password" placeholder="Admin Password" value={pass} onChange={e => setPass(e.target.value)} onKeyDown={e => e.key === "Enter" && verify()} />
-        {error && <p className="auth-error">{error}</p>}
-        <button className="btn-primary full" onClick={verify} disabled={loading}>{loading ? <span className="spinner" /> : "Enter Panel"}</button>
-      </motion.div>
-    </div>
-  );
-};
-
 // ─── ORDER CHAT ───────────────────────────────────────────
 const OrderChat = ({ order, onClose }) => {
   const [messages, setMessages] = useState([]); const [text, setText] = useState(""); const [loading, setLoading] = useState(true); const [sending, setSending] = useState(false);
+  const [chatErr, setChatErr] = useState("");
   const bottomRef = useRef(null);
-  useEffect(() => { api(`/orders/${order._id}/messages`).then(d => { setMessages(d.messages || []); setLoading(false); }); }, [order._id]);
+  const orderId = order?._id;
+  useEffect(() => {
+    if (!orderId) { setLoading(false); setChatErr("Invalid order"); return; }
+    api(`/orders/${orderId}/messages`).then(d => { setMessages(Array.isArray(d.messages) ? d.messages : []); setLoading(false); }).catch(e => { console.error("Chat fetch error:", e); setChatErr("Failed to load messages"); setLoading(false); });
+  }, [orderId]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
   const send = async () => {
-    if (!text.trim()) return; setSending(true);
-    const d = await api(`/orders/${order._id}/messages`, { method: "POST", body: JSON.stringify({ text }) });
-    if (d.message) setMessages(m => [...m, d.message]);
+    if (!text.trim() || !orderId) return; setSending(true);
+    try {
+      const d = await api(`/orders/${orderId}/messages`, { method: "POST", body: JSON.stringify({ text }) });
+      if (d.message) setMessages(m => [...m, d.message]);
+    } catch (e) { console.error("Chat send error:", e); }
     setText(""); setSending(false);
   };
   return (
     <div className="admin-overlay" onClick={onClose}>
       <motion.div className="admin-panel chat-panel" onClick={e => e.stopPropagation()} initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}>
         <div className="admin-header">
-          <div><h2 style={{ display: "flex", alignItems: "center", gap: 8 }}><Icon name="chat" size={20} /> Chat</h2><p style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>{order.user?.name || "Customer"} · ₹{order.total?.toLocaleString("en-IN")}</p></div>
+          <div><h2 style={{ display: "flex", alignItems: "center", gap: 8 }}><Icon name="chat" size={20} /> Chat</h2><p style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>{order?.user?.name || "Customer"} · {typeof order?.total === "number" ? "₹" + order.total.toLocaleString("en-IN") : ""}</p></div>
           <button className="modal-close" onClick={onClose}><Icon name="close" size={14} /></button>
         </div>
         <div className="chat-messages">
-          {loading && <p style={{ color: "var(--text-muted)", textAlign: "center", padding: 20 }}>Loading...</p>}
-          {!loading && messages.length === 0 && <p style={{ color: "var(--text-muted)", textAlign: "center", marginTop: 60 }}>No messages yet</p>}
-          {messages.map((m, i) => (
+          {chatErr && <p style={{ color: "#f87171", textAlign: "center", padding: 20 }}>{chatErr}</p>}
+          {!chatErr && loading && <p style={{ color: "var(--text-muted)", textAlign: "center", padding: 20 }}>Loading...</p>}
+          {!chatErr && !loading && messages.length === 0 && <p style={{ color: "var(--text-muted)", textAlign: "center", marginTop: 60 }}>No messages yet</p>}
+          {!chatErr && safeArr(messages).map((m, i) => m && (
             <div key={i} className={`chat-bubble-wrap ${m.from === "admin" ? "admin" : "user"}`}>
               <div className={`chat-bubble ${m.from === "admin" ? "admin" : "user"}`}>
                 {m.text}
@@ -446,8 +448,8 @@ const OrderChat = ({ order, onClose }) => {
           <div ref={bottomRef} />
         </div>
         <div className="chat-input">
-          <input value={text} onChange={e => setText(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} placeholder="Type a message..." />
-          <button className="btn-primary" onClick={send} disabled={sending || !text.trim()} style={{ padding: "10px 18px" }}>{sending ? <span className="spinner" /> : "Send"}</button>
+          <input value={text} onChange={e => setText(e.target.value)} onKeyDown={e => e.key === "Enter" && !chatErr && send()} placeholder={chatErr ? "Chat unavailable" : "Type a message..."} disabled={!!chatErr} />
+          <button className="btn-primary" onClick={send} disabled={sending || !text.trim() || !!chatErr} style={{ padding: "10px 18px" }}>{sending ? <span className="spinner" /> : "Send"}</button>
         </div>
       </motion.div>
     </div>
@@ -463,41 +465,43 @@ const AdminPanel = ({ onClose }) => {
   const [loading, setLoading] = useState(false); const [msg, setMsg] = useState("");
   const [upiForm, setUpiForm] = useState({ upiId: "", upiName: "", qrImage: "" });
   const [upiMsg, setUpiMsg] = useState(""); const [upiLoading, setUpiLoading] = useState(false);
-  // ✅ FIX: name field added to newAdmin
   const [newAdmin, setNewAdmin] = useState({ name: "", email: "", password: "" });
   const [adminMsg, setAdminMsg] = useState("");
+  const [adminError, setAdminError] = useState("");
   const [statusFilter, setStatusFilter] = useState("pending"); const [chatOrder, setChatOrder] = useState(null);
   const fileRef = useRef(null);
 
   useEffect(() => {
-    api("/products").then(p => { if (!p.error) setProducts(p.products || []); });
-    api("/upi").then(u => { if (!u.error && u.upiId) setUpiForm(prev => ({ ...prev, upiId: u.upiId, upiName: u.upiName, qrImage: u.qrImage || "" })); });
+    api("/products").then(p => { if (!p.error) setProducts(safeArr(p.products)); }).catch(e => { console.error("Admin init fetch /products:", e); setAdminError("Failed to load products"); });
+    api("/upi").then(u => { if (!u.error && u.upiId) setUpiForm(prev => ({ ...prev, upiId: u.upiId, upiName: u.upiName, qrImage: u.qrImage || "" })); }).catch(e => console.error("Admin init fetch /upi:", e));
   }, []);
 
   const fetchTab = useCallback(async (activeTab) => {
-    switch (activeTab) {
-      case "products": {
-        const p = await api("/products");
-        if (!p.error) setProducts(p.products || []);
-        break;
+    try {
+      switch (activeTab) {
+        case "products": {
+          const p = await api("/products");
+          if (!p.error) setProducts(safeArr(p.products));
+          break;
+        }
+        case "orders": {
+          const o = await api("/orders/all");
+          if (!o.error) setOrders(safeArr(o.orders));
+          break;
+        }
+        case "receipts": {
+          const r = await api("/receipts");
+          if (!r.error) setReceipts(safeArr(r.receipts));
+          break;
+        }
+        case "admins": {
+          const a = await api("/admins");
+          if (!a.error) setAdmins(safeArr(a.admins));
+          break;
+        }
+        default: break;
       }
-      case "orders": {
-        const o = await api("/orders/all");
-        if (!o.error) setOrders(o.orders || []);
-        break;
-      }
-      case "receipts": {
-        const r = await api("/receipts");
-        if (!r.error) setReceipts(r.receipts || []);
-        break;
-      }
-      case "admins": {
-        const a = await api("/admins");
-        if (!a.error) setAdmins(a.admins || []);
-        break;
-      }
-      default: break;
-    }
+    } catch (e) { console.error("fetchTab error:", activeTab, e); setAdminError(`Failed to load ${activeTab}`); }
   }, []);
 
   useEffect(() => { if (tab !== "add" && tab !== "upi") fetchTab(tab); }, [tab, fetchTab]);
@@ -511,41 +515,46 @@ const AdminPanel = ({ onClose }) => {
   const addProduct = async () => {
     if (!form.name || !form.price) return setMsg("Name and price required!");
     setLoading(true);
-    let imageUrl = "", mediaUrl = "", mType = "image";
-    if (mediaFile) {
-      setMsg("Uploading media...");
-      const up = await uploadFile(mediaFile);
-      if (up.url) { imageUrl = up.mediaType === "image" ? up.url : ""; mediaUrl = up.url; mType = up.mediaType; }
-    }
-    await api("/products", { method: "POST", body: JSON.stringify({ ...form, price: Number(form.price), imageUrl, mediaUrl, mediaType: mType }) });
-    setForm({ name: "", description: "", price: "", stock: 10 }); setMediaFile(null); setMediaPreview(null);
-    setMsg("✅ Product added!"); await fetchTab("products"); setLoading(false);
+    try {
+      let imageUrl = "", mediaUrl = "", mType = "image";
+      if (mediaFile) {
+        setMsg("Uploading media...");
+        const up = await uploadFile(mediaFile);
+        if (up.url) { imageUrl = up.mediaType === "image" ? up.url : ""; mediaUrl = up.url; mType = up.mediaType; }
+      }
+      await api("/products", { method: "POST", body: JSON.stringify({ ...form, price: Number(form.price), imageUrl, mediaUrl, mediaType: mType }) });
+      setForm({ name: "", description: "", price: "", stock: 10 }); setMediaFile(null); setMediaPreview(null);
+      setMsg("✅ Product added!"); await fetchTab("products");
+    } catch (e) { console.error("addProduct error:", e); setMsg("❌ Failed to add product"); }
+    setLoading(false);
     setTimeout(() => setMsg(""), 2500);
   };
 
-  const deleteProduct = async (id) => { await api(`/products/${id}`, { method: "DELETE" }); await fetchTab("products"); };
-  const updateOrderStatus = async (id, status) => { await api(`/orders/${id}/status`, { method: "PUT", body: JSON.stringify({ status }) }); await fetchTab("orders"); };
-  const confirmReceipt = async (receiptId, status) => { await api(`/receipts/${receiptId}/status`, { method: "PUT", body: JSON.stringify({ status }) }); await fetchTab("receipts"); };
+  const deleteProduct = async (id) => { try { await api(`/products/${id}`, { method: "DELETE" }); await fetchTab("products"); } catch (e) { console.error("deleteProduct error:", e); } };
+  const updateOrderStatus = async (id, status) => { try { await api(`/orders/${id}/status`, { method: "PUT", body: JSON.stringify({ status }) }); await fetchTab("orders"); } catch (e) { console.error("updateOrderStatus error:", e); } };
+  const confirmReceipt = async (receiptId, status) => { try { await api(`/receipts/${receiptId}/status`, { method: "PUT", body: JSON.stringify({ status }) }); await fetchTab("receipts"); } catch (e) { console.error("confirmReceipt error:", e); } };
 
   const addAdmin = async () => {
     if (!newAdmin.name.trim() || !newAdmin.email.trim() || !newAdmin.password.trim())
       return setAdminMsg("❌ All fields (name, email, password) are required!");
-    const d = await api("/admins", { method: "POST", body: JSON.stringify(newAdmin) });
-    if (d.error || d.message?.toLowerCase().includes("error") || (!d.user && !d.message?.includes("promoted") && !d.message?.includes("created"))) {
-      return setAdminMsg("❌ " + (d.message || "Failed to add admin"));
-    }
-    setAdminMsg("✅ Admin added successfully!"); setNewAdmin({ name: "", email: "", password: "" }); await fetchTab("admins");
+    try {
+      const d = await api("/admins", { method: "POST", body: JSON.stringify(newAdmin) });
+      if (d.error) return setAdminMsg("❌ " + (d.message || "Failed to add admin"));
+      setAdminMsg("✅ Admin added successfully!"); setNewAdmin({ name: "", email: "", password: "" }); await fetchTab("admins");
+    } catch (e) { console.error("addAdmin error:", e); setAdminMsg("❌ Failed to add admin"); }
     setTimeout(() => setAdminMsg(""), 3000);
   };
 
-  const removeAdmin = async (id) => { await api(`/admins/${id}`, { method: "DELETE" }); await fetchTab("admins"); };
+  const removeAdmin = async (id) => { try { await api(`/admins/${id}`, { method: "DELETE" }); await fetchTab("admins"); } catch (e) { console.error("removeAdmin error:", e); } };
 
   const saveUpi = async () => {
     if (!upiForm.upiId || !upiForm.upiName) return setUpiMsg("UPI ID and name required!");
     setUpiLoading(true);
-    const d = await api("/upi", { method: "PUT", body: JSON.stringify(upiForm) });
+    try {
+      const d = await api("/upi", { method: "PUT", body: JSON.stringify(upiForm) });
+      setUpiMsg(d.settings ? "✅ Saved!" : "❌ " + (d.message || "Failed"));
+    } catch (e) { console.error("saveUpi error:", e); setUpiMsg("❌ Failed to save UPI settings"); }
     setUpiLoading(false);
-    setUpiMsg(d.settings ? "✅ Saved!" : "❌ " + (d.message || "Failed"));
     setTimeout(() => setUpiMsg(""), 2500);
   };
 
@@ -554,9 +563,13 @@ const AdminPanel = ({ onClose }) => {
     const reader = new FileReader(); reader.onload = () => setUpiForm(f => ({ ...f, qrImage: reader.result })); reader.readAsDataURL(file);
   };
 
-  const filteredOrders = statusFilter === "all" ? orders : orders.filter(o => o.status === statusFilter);
-  const pendingCount = orders.filter(o => o.status === "pending").length;
-  const pendingReceipts = receipts.filter(r => r.status === "pending").length;
+  const safeProds = safeArr(products);
+  const safeOrders = safeArr(orders);
+  const safeRecs = safeArr(receipts);
+  const safeAdmins = safeArr(admins);
+  const filteredOrders = statusFilter === "all" ? safeOrders : safeOrders.filter(o => o && o.status === statusFilter);
+  const pendingCount = safeOrders.filter(o => o && o.status === "pending").length;
+  const pendingRecs = safeRecs.filter(r => r && r.status === "pending").length;
   const TABS = ["add", "products", "orders", "receipts", "upi", "admins"];
 
   return (
@@ -575,16 +588,18 @@ const AdminPanel = ({ onClose }) => {
           {TABS.map(t => (
             <button key={t} className={`admin-tab-btn ${tab === t ? "active" : ""}`} onClick={() => setTab(t)}>
               {t === "add" ? "✚ Add Product"
-               : t === "products" ? <span><Icon name="shop" size={14} /> Products ({products.length})</span>
+               : t === "products" ? <span><Icon name="shop" size={14} /> Products ({safeProds.length})</span>
                : t === "orders" ? <span><Icon name="package" size={14} /> Orders {pendingCount > 0 && <span className="tab-badge">{pendingCount}</span>}</span>
-               : t === "receipts" ? <span><Icon name="receipt" size={14} /> Receipts {pendingReceipts > 0 && <span className="tab-badge">{pendingReceipts}</span>}</span>
+               : t === "receipts" ? <span><Icon name="receipt" size={14} /> Receipts {pendingRecs > 0 && <span className="tab-badge">{pendingRecs}</span>}</span>
                : t === "upi" ? <span><Icon name="cart" size={14} /> UPI Settings</span>
-               : <span><Icon name="crown" size={14} /> Admins ({admins.length})</span>}
+               : <span><Icon name="crown" size={14} /> Admins ({safeAdmins.length})</span>}
             </button>
           ))}
         </div>
 
         <div className="admin-fullpage-content">
+
+          {adminError && <div className="admin-msg error" style={{ marginBottom: 16 }}>⚠️ {adminError} <button onClick={() => setAdminError("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", marginLeft: 12, fontWeight: 700 }}>✕</button></div>}
 
           {/* ADD PRODUCT */}
           {tab === "add" && (
@@ -632,10 +647,9 @@ const AdminPanel = ({ onClose }) => {
           {/* PRODUCTS */}
           {tab === "products" && (
             <div>
-              <h2 className="admin-section-title">{products.length} Products</h2>
+              <h2 className="admin-section-title">{safeProds.length} Products</h2>
               <div className="admin-products-grid">
-                {products.length === 0 && <p className="empty-state">No products yet!</p>}
-                {products.map(p => (
+                {safeProds.length === 0 ? <p className="empty-state">No products yet!</p> : safeProds.map(p => p && (
                   <motion.div key={p._id} className="admin-product-card" layout>
                     {p.mediaType === "video"
                       ? <video src={p.mediaUrl} style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: "10px 10px 0 0" }} muted />
@@ -663,8 +677,7 @@ const AdminPanel = ({ onClose }) => {
                 ))}
               </div>
               <div className="admin-orders-list">
-                {filteredOrders.length === 0 && <p className="empty-state">No orders!</p>}
-                {filteredOrders.map(o => (
+                {!filteredOrders || filteredOrders.length === 0 ? <p className="empty-state">No orders!</p> : filteredOrders.map(o => o && (
                   <div key={o._id} className="admin-order-card">
                     <div className="order-card-left">
                       <strong>{o.user?.name || "Guest"}</strong>
@@ -691,17 +704,16 @@ const AdminPanel = ({ onClose }) => {
             <div>
               <h2 className="admin-section-title">Payment Receipts</h2>
               <div className="admin-orders-list">
-                {receipts.length === 0 && <p className="empty-state">No receipts yet!</p>}
-                {receipts.map(r => (
-                  <div key={r._id} className="admin-order-card">
+                {safeRecs.length === 0 ? <p className="empty-state">No receipts yet!</p> : safeRecs.map(r => r && (
+                  <div key={r._id || Math.random()} className="admin-order-card">
                     <div className="order-card-left">
-                      <strong style={{ fontFamily: "monospace", color: "var(--purple2)" }}>{r.receiptId}</strong>
-                      <span>{r.user?.name} · {r.user?.email}</span>
-                      <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>{new Date(r.createdAt).toLocaleDateString("en-IN")}</span>
+                      <strong style={{ fontFamily: "monospace", color: "var(--purple2)" }}>{r.receiptId || "—"}</strong>
+                      <span>{r.user?.name || "—"} · {r.user?.email || "—"}</span>
+                      {r.createdAt && <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>{new Date(r.createdAt).toLocaleDateString("en-IN")}</span>}
                     </div>
                     <div className="order-card-right">
-                      <strong style={{ color: "var(--pink)", fontSize: "1.1rem" }}>₹{r.total?.toLocaleString("en-IN")}</strong>
-                      <span className={`order-status ${r.status}`}>{r.status}</span>
+                      {typeof r.total === "number" && <strong style={{ color: "var(--pink)", fontSize: "1.1rem" }}>₹{r.total.toLocaleString("en-IN")}</strong>}
+                      <span className={`order-status ${r.status || "pending"}`}>{r.status || "pending"}</span>
                       {r.status === "pending" && (
                         <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
                           <button onClick={() => confirmReceipt(r.receiptId, "confirmed")} style={{ padding: "5px 12px", borderRadius: 6, fontSize: "0.78rem", background: "#22c55e", color: "#fff", border: "none", cursor: "pointer", fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}><Icon name="check" size={12} /> Confirm</button>
@@ -751,10 +763,10 @@ const AdminPanel = ({ onClose }) => {
               <p style={{ color: "var(--text-muted)", fontSize: "0.82rem", marginBottom: 8 }}>💡 If this email already has an account, they'll be promoted to admin.</p>
               <button className="btn-primary" style={{ padding: "13px 32px" }} onClick={addAdmin}>Add Admin</button>
 
-              <h2 className="admin-section-title" style={{ marginTop: 36 }}>Current Admins ({admins.length})</h2>
+              <h2 className="admin-section-title" style={{ marginTop: 36 }}>Current Admins ({safeAdmins.length})</h2>
               <div className="admin-orders-list">
-                {admins.map(a => (
-                  <div key={a._id} className="admin-order-card">
+                {safeAdmins.map(a => a && (
+                  <div key={a._id || Math.random()} className="admin-order-card">
                     <div className="order-card-left">
                       <strong>{a.name}</strong>
                       <span>{a.email}</span>
@@ -1013,7 +1025,7 @@ const QuickViewModal = ({ product, onClose, onAddCart, onBuyNow, addToast }) => 
 // ─── MAIN APP ─────────────────────────────────────────────
 export default function App() {
   const [user, setUser] = useState(null); const [page, setPage] = useState("shop");
-  const [showAuth, setShowAuth] = useState(false); const [showAdminAuth, setShowAdminAuth] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [upiData, setUpiData] = useState(null);
   const [cart, setCart] = useState(() => { try { return JSON.parse(localStorage.getItem("vc_cart") || "[]"); } catch { return []; } });
@@ -1076,9 +1088,11 @@ export default function App() {
   if (showAdmin) return (
     <div className="app">
       <ParticleBackground />
-      <AnimatePresence>
-        <AdminPanel key="admin" onClose={() => setShowAdmin(false)} />
-      </AnimatePresence>
+      <AdminErrorBoundary>
+        <AnimatePresence>
+          <AdminPanel key="admin" onClose={() => setShowAdmin(false)} />
+        </AnimatePresence>
+      </AdminErrorBoundary>
     </div>
   );
 
@@ -1090,7 +1104,7 @@ export default function App() {
       <ParticleBackground />
       <BackToTop />
       <ToastContainer toasts={toasts} removeToast={removeToast} />
-      <Navbar user={user} onLogin={() => setShowAuth(true)} onLogout={logout} onAdmin={() => setShowAdminAuth(true)} page={page} setPage={setPage} cartCount={cartCount} cart={cart} setCart={setCart} miniCartOpen={miniCartOpen} setMiniCartOpen={setMiniCartOpen} addToast={addToast} />
+      <Navbar user={user} onLogin={() => setShowAuth(true)} onLogout={logout} onAdmin={() => setShowAdmin(true)} page={page} setPage={setPage} cartCount={cartCount} cart={cart} setCart={setCart} miniCartOpen={miniCartOpen} setMiniCartOpen={setMiniCartOpen} addToast={addToast} />
       <main className="main">
         <AnimatePresence mode="wait">
           {page === "shop" && <motion.div key="shop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><ShopPage onAddCart={addToCart} onBuyNow={handleBuyNow} onQuickView={setQuickView} /></motion.div>}
@@ -1100,7 +1114,6 @@ export default function App() {
       </main>
       <AnimatePresence>
         {showAuth && <AuthModal key="auth" onClose={() => setShowAuth(false)} onSuccess={u => { setUser(u); setShowAuth(false); addToast("Welcome to VisionCart!", "success"); }} />}
-        {showAdminAuth && <AdminAuthModal key="adminauth" onClose={() => setShowAdminAuth(false)} onVerified={() => setShowAdmin(true)} />}
         {upiData && <UPIModal key="upi" amount={upiData.amount} orderId={upiData.orderId} user={user} onClose={() => setUpiData(null)} onReceiptGenerated={() => setCart([])} />}
         {quickView && <QuickViewModal key="quickview" product={quickView} onClose={() => setQuickView(null)} onAddCart={addToCart} onBuyNow={handleBuyNow} addToast={addToast} />}
       </AnimatePresence>
