@@ -131,13 +131,14 @@ app.use(passport.session());
 
 // ─── SCHEMAS ──────────────────────────────────────────────
 const userSchema = new mongoose.Schema({
-  name:     { type: String, required: true },
-  email:    { type: String, required: true, unique: true },
-  password: { type: String },
-  avatar:   { type: String },
-  provider: { type: String, default: "local" },
-  role:     { type: String, enum: ["user", "admin"], default: "user" },
-  isAdmin:  { type: Boolean, default: false },
+  name:        { type: String, required: true },
+  email:       { type: String, required: true, unique: true },
+  password:    { type: String },
+  avatar:      { type: String },
+  provider:    { type: String, default: "local" },
+  role:        { type: String, enum: ["user", "staff", "admin"], default: "user" },
+  isAdmin:     { type: Boolean, default: false },
+  permissions: { type: [String], default: ["view_orders", "update_orders", "view_receipts"] },
 }, { timestamps: true });
 
 const productSchema = new mongoose.Schema({
@@ -148,6 +149,9 @@ const productSchema = new mongoose.Schema({
   mediaUrl:    { type: String },
   mediaType:   { type: String, enum: ["image", "video"], default: "image" },
   stock:       { type: Number, default: 10 },
+  category:    { type: String, default: "Uncategorized" },
+  views:       { type: Number, default: 0 },
+  salesCount:  { type: Number, default: 0 },
 }, { timestamps: true });
 
 const receiptSchema = new mongoose.Schema({
@@ -177,11 +181,41 @@ const upiSettingsSchema = new mongoose.Schema({
   qrImage: { type: String },
 }, { timestamps: true });
 
-const User        = mongoose.model("User",        userSchema);
-const Product     = mongoose.model("Product",     productSchema);
-const Order       = mongoose.model("Order",       orderSchema);
-const Receipt     = mongoose.model("Receipt",     receiptSchema);
-const UpiSettings = mongoose.model("UpiSettings", upiSettingsSchema);
+const categorySchema = new mongoose.Schema({
+  name:        { type: String, required: true, unique: true },
+  description: { type: String },
+  slug:        { type: String, unique: true },
+}, { timestamps: true });
+
+const announcementSchema = new mongoose.Schema({
+  title:    { type: String, required: true },
+  content:  { type: String },
+  isActive: { type: Boolean, default: true },
+}, { timestamps: true });
+
+const couponSchema = new mongoose.Schema({
+  code:            { type: String, required: true, unique: true },
+  discountPercent: { type: Number, required: true, min: 1, max: 100 },
+  isActive:        { type: Boolean, default: true },
+  expiresAt:       { type: Date },
+}, { timestamps: true });
+
+const activityLogSchema = new mongoose.Schema({
+  user:    { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  action:  { type: String, required: true },
+  details: { type: String },
+  ip:      { type: String },
+}, { timestamps: true });
+
+const User         = mongoose.model("User",         userSchema);
+const Product      = mongoose.model("Product",      productSchema);
+const Order        = mongoose.model("Order",        orderSchema);
+const Receipt      = mongoose.model("Receipt",      receiptSchema);
+const UpiSettings  = mongoose.model("UpiSettings",  upiSettingsSchema);
+const Category     = mongoose.model("Category",     categorySchema);
+const Announcement = mongoose.model("Announcement", announcementSchema);
+const Coupon       = mongoose.model("Coupon",       couponSchema);
+const ActivityLog  = mongoose.model("ActivityLog",  activityLogSchema);
 
 // ─── INDEXES ───────────────────────────────────────────────
 userSchema.index({ email: 1 });
@@ -227,6 +261,34 @@ async function sendDiscordWebhook(payload) {
       body: JSON.stringify(payload),
     });
   } catch (e) { console.error("Discord webhook error:", e.message); }
+}
+
+async function completeOrder(orderId) {
+  const order = await Order.findById(orderId);
+  if (!order || order.status === "paid") return;
+  order.status = "paid";
+  await order.save();
+
+  // Increment salesCount for each product
+  for (const item of order.items) {
+    if (item.product) {
+      await Product.findByIdAndUpdate(item.product, { $inc: { salesCount: item.qty } });
+    }
+  }
+}
+
+async function cancelOrder(orderId) {
+  const order = await Order.findById(orderId);
+  if (!order || order.status === "cancelled") return;
+  order.status = "cancelled";
+  await order.save();
+
+  // Restore stock!
+  for (const item of order.items) {
+    if (item.product) {
+      await Product.findByIdAndUpdate(item.product, { $inc: { stock: item.qty } });
+    }
+  }
 }
 
 async function seedAdmin() {
@@ -283,6 +345,29 @@ const adminMiddleware = (req, res, next) => {
   if (!req.user?.isAdmin && req.user?.role !== "admin") return res.status(403).json({ message: "Admin only" });
   next();
 };
+
+const authorize = (permission) => {
+  return (req, res, next) => {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    const isUserAdmin = req.user.isAdmin || req.user.role === "admin";
+    if (isUserAdmin) return next();
+    if (req.user.role === "staff") {
+      if (!permission || req.user.permissions.includes(permission)) {
+        return next();
+      }
+    }
+    return res.status(403).json({ message: "Forbidden: Insufficient permissions" });
+  };
+};
+
+async function logActivity(userId, action, details, req) {
+  try {
+    const ip = req ? (req.headers["x-forwarded-for"] || req.socket.remoteAddress) : "";
+    await ActivityLog.create({ user: userId, action, details, ip });
+  } catch (e) {
+    console.error("Failed to log activity:", e.message);
+  }
+}
 
 // ─── PASSPORT ─────────────────────────────────────────────
 passport.serializeUser((user, done) => done(null, user._id));
@@ -423,8 +508,432 @@ app.delete("/api/admins/:id", authMiddleware, adminMiddleware, async (req, res) 
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
+// ─── STAFF MANAGEMENT ─────────────────────────────────────
+// Get all staff members
+app.get("/api/staff", authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const staff = await User.find({ role: "staff" }).select("-password");
+    res.json({ staff });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// Add/Promote a staff member
+app.post("/api/staff", authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { email, name, password, permissions } = req.body;
+    if (!email || !name) return res.status(400).json({ message: "Name and email are required" });
+    const normalizedEmail = normalizeEmail(email);
+    const existing = await User.findOne({ email: normalizedEmail });
+    const perms = Array.isArray(permissions) ? permissions : ["view_orders", "update_orders", "view_receipts"];
+    
+    if (existing) {
+      existing.role = "staff";
+      existing.permissions = perms;
+      await existing.save();
+      await logActivity(req.user._id, "STAFF_PROMOTE", `Promoted ${existing.email} to staff`, req);
+      return res.json({ message: "User promoted to staff", user: existing });
+    }
+
+    if (!password || password.length < 8) {
+      return res.status(400).json({ message: "Password is required and must be at least 8 characters for a new account" });
+    }
+    const hashed = await bcrypt.hash(password, 12);
+    const user = await User.create({
+      name: name.trim(),
+      email: normalizedEmail,
+      password: hashed,
+      role: "staff",
+      permissions: perms
+    });
+    await logActivity(req.user._id, "STAFF_CREATE", `Created staff account for ${user.email}`, req);
+    res.status(201).json({ message: "Staff account created", user });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// Update staff permissions/role
+app.put("/api/staff/:id", authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { permissions, role } = req.body;
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: "Staff member not found" });
+    
+    if (permissions !== undefined && Array.isArray(permissions)) {
+      user.permissions = permissions;
+    }
+    if (role !== undefined && ["user", "staff", "admin"].includes(role)) {
+      user.role = role;
+      if (role === "admin") user.isAdmin = true;
+      if (role === "user") { user.isAdmin = false; user.permissions = []; }
+    }
+    await user.save();
+    await logActivity(req.user._id, "STAFF_UPDATE", `Updated role/permissions for ${user.email}`, req);
+    res.json({ message: "Staff updated successfully", user });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// Demote staff to user
+app.delete("/api/staff/:id", authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    user.role = "user";
+    user.permissions = [];
+    await user.save();
+    await logActivity(req.user._id, "STAFF_DEMOTE", `Demoted staff member ${user.email} to user`, req);
+    res.json({ message: "Staff demoted to user" });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// ─── CATEGORY MANAGEMENT ──────────────────────────────────
+app.get("/api/categories", async (req, res) => {
+  try {
+    const categories = await Category.find().sort({ name: 1 });
+    res.json({ categories });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.post("/api/categories", authMiddleware, authorize("manage_categories"), async (req, res) => {
+  try {
+    const { name, description } = req.body;
+    if (!name?.trim()) return res.status(400).json({ message: "Category name is required" });
+    const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const category = await Category.create({ name: name.trim(), description, slug });
+    await logActivity(req.user._id, "CATEGORY_ADD", `Created category ${name}`, req);
+    res.status(201).json({ category });
+  } catch (e) {
+    if (e.code === 11000) return res.status(400).json({ message: "Category already exists" });
+    res.status(500).json({ message: e.message });
+  }
+});
+
+app.put("/api/categories/:id", authMiddleware, authorize("manage_categories"), async (req, res) => {
+  try {
+    const { name, description } = req.body;
+    const update = {};
+    if (name !== undefined) {
+      update.name = name.trim();
+      update.slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    }
+    if (description !== undefined) update.description = description;
+    const category = await Category.findByIdAndUpdate(req.params.id, update, { new: true });
+    if (!category) return res.status(404).json({ message: "Category not found" });
+    await logActivity(req.user._id, "CATEGORY_UPDATE", `Updated category ${category.name}`, req);
+    res.json({ category });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.delete("/api/categories/:id", authMiddleware, authorize("manage_categories"), async (req, res) => {
+  try {
+    const category = await Category.findByIdAndDelete(req.params.id);
+    if (!category) return res.status(404).json({ message: "Category not found" });
+    await logActivity(req.user._id, "CATEGORY_DELETE", `Deleted category ${category.name}`, req);
+    res.json({ message: "Category deleted" });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// ─── ANNOUNCEMENTS ────────────────────────────────────────
+app.get("/api/announcements", async (req, res) => {
+  try {
+    const announcements = await Announcement.find({ isActive: true }).sort({ createdAt: -1 });
+    res.json({ announcements });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.get("/api/announcements/all", authMiddleware, authorize("manage_announcements"), async (req, res) => {
+  try {
+    const announcements = await Announcement.find().sort({ createdAt: -1 });
+    res.json({ announcements });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.post("/api/announcements", authMiddleware, authorize("manage_announcements"), async (req, res) => {
+  try {
+    const { title, content, isActive } = req.body;
+    if (!title?.trim()) return res.status(400).json({ message: "Title is required" });
+    const ann = await Announcement.create({ title: title.trim(), content, isActive });
+    await logActivity(req.user._id, "ANNOUNCEMENT_ADD", `Created announcement: ${title}`, req);
+    res.status(201).json({ announcement: ann });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.put("/api/announcements/:id", authMiddleware, authorize("manage_announcements"), async (req, res) => {
+  try {
+    const { title, content, isActive } = req.body;
+    const update = {};
+    if (title !== undefined) update.title = title.trim();
+    if (content !== undefined) update.content = content;
+    if (isActive !== undefined) update.isActive = isActive;
+    const ann = await Announcement.findByIdAndUpdate(req.params.id, update, { new: true });
+    if (!ann) return res.status(404).json({ message: "Announcement not found" });
+    await logActivity(req.user._id, "ANNOUNCEMENT_UPDATE", `Updated announcement: ${ann.title}`, req);
+    res.json({ announcement: ann });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.delete("/api/announcements/:id", authMiddleware, authorize("manage_announcements"), async (req, res) => {
+  try {
+    const ann = await Announcement.findByIdAndDelete(req.params.id);
+    if (!ann) return res.status(404).json({ message: "Announcement not found" });
+    await logActivity(req.user._id, "ANNOUNCEMENT_DELETE", `Deleted announcement: ${ann.title}`, req);
+    res.json({ message: "Announcement deleted" });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// ─── COUPONS ──────────────────────────────────────────────
+app.get("/api/coupons", authMiddleware, async (req, res) => {
+  try {
+    const coupons = await Coupon.find({ isActive: true });
+    res.json({ coupons });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.get("/api/coupons/all", authMiddleware, authorize("manage_coupons"), async (req, res) => {
+  try {
+    const coupons = await Coupon.find().sort({ createdAt: -1 });
+    res.json({ coupons });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.post("/api/coupons", authMiddleware, authorize("manage_coupons"), async (req, res) => {
+  try {
+    const { code, discountPercent, isActive, expiresAt } = req.body;
+    if (!code?.trim() || !discountPercent) return res.status(400).json({ message: "Code and discount percent are required" });
+    const coupon = await Coupon.create({
+      code: code.trim().toUpperCase(),
+      discountPercent: Number(discountPercent),
+      isActive: isActive !== false,
+      expiresAt: expiresAt ? new Date(expiresAt) : null
+    });
+    await logActivity(req.user._id, "COUPON_ADD", `Created coupon code ${coupon.code}`, req);
+    res.status(201).json({ coupon });
+  } catch (e) {
+    if (e.code === 11000) return res.status(400).json({ message: "Coupon code already exists" });
+    res.status(500).json({ message: e.message });
+  }
+});
+
+app.put("/api/coupons/:id", authMiddleware, authorize("manage_coupons"), async (req, res) => {
+  try {
+    const { code, discountPercent, isActive, expiresAt } = req.body;
+    const update = {};
+    if (code !== undefined) update.code = code.trim().toUpperCase();
+    if (discountPercent !== undefined) update.discountPercent = Number(discountPercent);
+    if (isActive !== undefined) update.isActive = isActive;
+    if (expiresAt !== undefined) update.expiresAt = expiresAt ? new Date(expiresAt) : null;
+    const coupon = await Coupon.findByIdAndUpdate(req.params.id, update, { new: true });
+    if (!coupon) return res.status(404).json({ message: "Coupon not found" });
+    await logActivity(req.user._id, "COUPON_UPDATE", `Updated coupon ${coupon.code}`, req);
+    res.json({ coupon });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.delete("/api/coupons/:id", authMiddleware, authorize("manage_coupons"), async (req, res) => {
+  try {
+    const coupon = await Coupon.findByIdAndDelete(req.params.id);
+    if (!coupon) return res.status(404).json({ message: "Coupon not found" });
+    await logActivity(req.user._id, "COUPON_DELETE", `Deleted coupon ${coupon.code}`, req);
+    res.json({ message: "Coupon deleted" });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// ─── LOGS AND ACTIONS ─────────────────────────────────────
+app.get("/api/logs", authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const logs = await ActivityLog.find()
+      .populate("user", "name email role")
+      .sort({ createdAt: -1 })
+      .limit(100);
+    res.json({ logs });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// ─── DEEP ANALYTICS ───────────────────────────────────────
+app.get("/api/analytics/dashboard", authMiddleware, authorize("view_analytics"), async (req, res) => {
+  try {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    // 1. Revenue calculations
+    const [allConfirmed, todayConfirmed, weekConfirmed, monthConfirmed] = await Promise.all([
+      Receipt.aggregate([{ $match: { status: "confirmed" } }, { $group: { _id: null, total: { $sum: "$total" } } }]),
+      Receipt.aggregate([{ $match: { status: "confirmed", createdAt: { $gte: startOfToday } } }, { $group: { _id: null, total: { $sum: "$total" } } }]),
+      Receipt.aggregate([{ $match: { status: "confirmed", createdAt: { $gte: sevenDaysAgo } } }, { $group: { _id: null, total: { $sum: "$total" } } }]),
+      Receipt.aggregate([{ $match: { status: "confirmed", createdAt: { $gte: thirtyDaysAgo } } }, { $group: { _id: null, total: { $sum: "$total" } } }])
+    ]);
+
+    const totalRevenue = allConfirmed[0]?.total || 0;
+    const todayRevenue = todayConfirmed[0]?.total || 0;
+    const weeklyRevenue = weekConfirmed[0]?.total || 0;
+    const monthlyRevenue = monthConfirmed[0]?.total || 0;
+
+    // 2. Orders calculations
+    const [totalOrders, pendingOrders, completedOrders, failedOrders] = await Promise.all([
+      Order.countDocuments(),
+      Order.countDocuments({ status: "pending" }),
+      Order.countDocuments({ status: "paid" }),
+      Order.countDocuments({ status: "cancelled" })
+    ]);
+
+    // 3. Products metrics
+    const totalProducts = await Product.countDocuments();
+    const bestSellers = await Product.find().sort({ salesCount: -1 }).limit(5);
+    const lowPerformers = await Product.find().sort({ salesCount: 1 }).limit(5);
+    const mostViewed = await Product.find().sort({ views: -1 }).limit(5);
+
+    // 4. Users growth
+    const totalUsers = await User.countDocuments({ role: "user" });
+    const newUsers = await User.countDocuments({ role: "user", createdAt: { $gte: sevenDaysAgo } });
+    const returningUsers = Math.max(0, totalUsers - newUsers);
+
+    // 5. Conversion Rate
+    const conversionRate = totalOrders > 0 ? Number(((completedOrders / totalOrders) * 100).toFixed(1)) : 0;
+
+    // 6. Category-wise performance
+    const categoryStats = await Product.aggregate([
+      { $group: { _id: "$category", count: { $sum: 1 }, totalSales: { $sum: "$salesCount" }, totalViews: { $sum: "$views" } } },
+      { $sort: { totalSales: -1 } }
+    ]);
+
+    // 7. Graph data (last 7 days daily stats)
+    const dailyStats = await Receipt.aggregate([
+      { $match: { status: "confirmed", createdAt: { $gte: sevenDaysAgo } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          revenue: { $sum: "$total" },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    const dailyOrders = await Order.aggregate([
+      { $match: { createdAt: { $gte: sevenDaysAgo } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    // Fill missing dates for graphs
+    const graphData = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split("T")[0];
+      const revEntry = dailyStats.find(s => s._id === dateStr);
+      const ordEntry = dailyOrders.find(s => s._id === dateStr);
+      graphData.push({
+        date: dateStr,
+        revenue: revEntry ? revEntry.revenue : 0,
+        orders: ordEntry ? ordEntry.count : 0
+      });
+    }
+
+    res.json({
+      revenue: { total: totalRevenue, today: todayRevenue, weekly: weeklyRevenue, monthly: monthlyRevenue },
+      orders: { total: totalOrders, pending: pendingOrders, completed: completedOrders, failed: failedOrders },
+      products: { total: totalProducts, bestSellers, lowPerformers, mostViewed },
+      users: { total: totalUsers, new: newUsers, returning: returningUsers },
+      conversionRate,
+      categoryStats,
+      graphData
+    });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// ─── VISION AI (GEMINI) ───────────────────────────────────
+app.post("/api/ai/chat", authMiddleware, authorize(), async (req, res) => {
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(200).json({
+        reply: "⚠️ **Gemini API key is not configured.** Please add the `GEMINI_API_KEY` to your backend `.env` file to enable the Vision AI assistant features."
+      });
+    }
+
+    const { message, chatHistory } = req.body;
+    if (!message?.trim()) return res.status(400).json({ message: "Message is required" });
+
+    // Fetch brief stats for context grounding
+    const [totalProducts, totalOrders, pendingOrders, completedOrders, failedOrders, allConfirmed] = await Promise.all([
+      Product.countDocuments(),
+      Order.countDocuments(),
+      Order.countDocuments({ status: "pending" }),
+      Order.countDocuments({ status: "paid" }),
+      Order.countDocuments({ status: "cancelled" }),
+      Receipt.aggregate([{ $match: { status: "confirmed" } }, { $group: { _id: null, total: { $sum: "$total" } } }])
+    ]);
+    const totalRevenue = allConfirmed[0]?.total || 0;
+    const bestSellers = await Product.find().sort({ salesCount: -1 }).limit(3);
+    const lowPerformers = await Product.find().sort({ salesCount: 1 }).limit(3);
+    const categoryStats = await Product.aggregate([
+      { $group: { _id: "$category", count: { $sum: 1 }, totalSales: { $sum: "$salesCount" } } }
+    ]);
+
+    const systemPrompt = `You are Vision AI, the intelligent virtual store manager and assistant for VisionCart.
+You have access to the store's current live metrics and data:
+- Total products: ${totalProducts}
+- Total orders: ${totalOrders} (Pending: ${pendingOrders}, Completed: ${completedOrders}, Cancelled: ${failedOrders})
+- Total revenue: ₹${totalRevenue.toLocaleString("en-IN")}
+- Best-selling products: ${bestSellers.map(p => `${p.name} (Sales: ${p.salesCount || 0})`).join(", ")}
+- Low-performing products: ${lowPerformers.map(p => `${p.name} (Sales: ${p.salesCount || 0})`).join(", ")}
+- Category performance: ${categoryStats.map(c => `${c._id || "Uncategorized"}: ${c.totalSales || 0} sales`).join(", ")}
+
+Your goal is to assist the admin or staff user with running the store:
+1. Explain analytics and store performance trends in simple, business-oriented terms.
+2. Suggest actionable marketing, pricing, or product page copy updates.
+3. Help write announcement banners, product descriptions, or reply templates for customer support chats.
+4. Diagnose errors or issues related to failed orders or receipts.
+Always respond in a professional, helpful, store-manager tone. Use clean markdown format (bolding, lists, bullet points, headers) for clarity.
+Keep your answer relatively concise but thorough.`;
+
+    const contents = [];
+    contents.push({ role: "user", parts: [{ text: systemPrompt }] });
+    contents.push({ role: "model", parts: [{ text: "Understood. I am ready to assist with VisionCart management." }] });
+    
+    if (Array.isArray(chatHistory)) {
+      chatHistory.forEach(h => {
+        contents.push({
+          role: h.sender === "ai" ? "model" : "user",
+          parts: [{ text: h.text }]
+        });
+      });
+    }
+    
+    contents.push({ role: "user", parts: [{ text: message }] });
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents })
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      return res.status(200).json({
+        reply: `❌ **Gemini API Error:** ${err?.error?.message || "Failed to communicate with Gemini API."}`
+      });
+    }
+
+    const result = await response.json();
+    const replyText = result?.candidates?.[0]?.content?.parts?.[0]?.text || "No response received from AI assistant.";
+
+    res.json({ reply: replyText });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
 // ─── IMAGE UPLOAD ─────────────────────────────────────────
-app.post("/api/upload", authMiddleware, adminMiddleware, upload.single("file"), async (req, res) => {
+app.post("/api/upload", authMiddleware, authorize("manage_products"), upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
     res.json({
@@ -458,32 +967,33 @@ app.get("/api/products/:id", async (req, res) => {
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-app.post("/api/products", authMiddleware, adminMiddleware, async (req, res) => {
+app.post("/api/products", authMiddleware, authorize("manage_products"), async (req, res) => {
   try {
-    const { name, description, price, imageUrl, mediaUrl, mediaType, stock } = req.body;
+    const { name, description, price, imageUrl, mediaUrl, mediaType, stock, category } = req.body;
     if (!name || !price) return res.status(400).json({ message: "Name and price required" });
     const numericPrice = Number(price);
     const numericStock = stock === undefined ? 10 : Number(stock);
     if (!Number.isFinite(numericPrice) || numericPrice <= 0) return res.status(400).json({ message: "Invalid price" });
     if (!Number.isInteger(numericStock) || numericStock < 0) return res.status(400).json({ message: "Invalid stock" });
-    res.status(201).json({
-      product: await Product.create({
-        name: name.trim(),
-        description: (description || "").trim().slice(0, 2000),
-        price: numericPrice,
-        imageUrl,
-        mediaUrl,
-        mediaType,
-        stock: numericStock,
-      }),
+    const product = await Product.create({
+      name: name.trim(),
+      description: (description || "").trim().slice(0, 2000),
+      price: numericPrice,
+      imageUrl,
+      mediaUrl,
+      mediaType,
+      stock: numericStock,
+      category: category || "Uncategorized",
     });
+    await logActivity(req.user._id, "PRODUCT_ADD", `Added product ${product.name}`, req);
+    res.status(201).json({ product });
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-app.put("/api/products/:id", authMiddleware, adminMiddleware, async (req, res) => {
+app.put("/api/products/:id", authMiddleware, authorize("manage_products"), async (req, res) => {
   try {
     if (!isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid product id" });
-    const allowed = ["name", "description", "price", "imageUrl", "mediaUrl", "mediaType", "stock"];
+    const allowed = ["name", "description", "price", "imageUrl", "mediaUrl", "mediaType", "stock", "category"];
     const update = {};
     for (const key of allowed) {
       if (req.body[key] !== undefined) update[key] = req.body[key];
@@ -492,15 +1002,23 @@ app.put("/api/products/:id", authMiddleware, adminMiddleware, async (req, res) =
     if (update.description !== undefined) update.description = String(update.description).trim().slice(0, 2000);
     if (update.price !== undefined) { const p = Number(update.price); if (!Number.isFinite(p) || p <= 0) return res.status(400).json({ message: "Invalid price" }); update.price = p; }
     if (update.stock !== undefined) { const s = Number(update.stock); if (!Number.isInteger(s) || s < 0) return res.status(400).json({ message: "Invalid stock" }); update.stock = s; }
-    res.json({ product: await Product.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true }) });
+    const product = await Product.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
+    if (product) {
+      await logActivity(req.user._id, "PRODUCT_UPDATE", `Updated product ${product.name}`, req);
+    }
+    res.json({ product });
   }
   catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-app.delete("/api/products/:id", authMiddleware, adminMiddleware, async (req, res) => {
+app.delete("/api/products/:id", authMiddleware, authorize("manage_products"), async (req, res) => {
   try {
     if (!isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid product id" });
-    await Product.findByIdAndDelete(req.params.id); res.json({ message: "Deleted" });
+    const product = await Product.findByIdAndDelete(req.params.id);
+    if (product) {
+      await logActivity(req.user._id, "PRODUCT_DELETE", `Deleted product ${product.name}`, req);
+    }
+    res.json({ message: "Deleted" });
   }
   catch (e) { res.status(500).json({ message: e.message }); }
 });
@@ -552,7 +1070,7 @@ app.get("/api/orders/my", authMiddleware, async (req, res) => {
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-app.get("/api/orders/all", authMiddleware, adminMiddleware, async (req, res) => {
+app.get("/api/orders/all", authMiddleware, authorize("view_orders"), async (req, res) => {
   try {
     const { page, limit, skip } = parsePagination(req.query);
     const filter = {};
@@ -567,7 +1085,7 @@ app.get("/api/orders/all", authMiddleware, adminMiddleware, async (req, res) => 
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-app.put("/api/orders/:id/status", authMiddleware, adminMiddleware, async (req, res) => {
+app.put("/api/orders/:id/status", authMiddleware, authorize("update_orders"), async (req, res) => {
   try {
     if (!isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid order id" });
     if (!["pending", "paid", "cancelled"].includes(req.body.status)) return res.status(400).json({ message: "Invalid status" });
@@ -644,8 +1162,8 @@ app.get("/api/receipts/:receiptId", authMiddleware, async (req, res) => {
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// Admin — get all receipts
-app.get("/api/receipts", authMiddleware, adminMiddleware, async (req, res) => {
+// Admin/Staff — get all receipts
+app.get("/api/receipts", authMiddleware, authorize("view_receipts"), async (req, res) => {
   try {
     const { page, limit, skip } = parsePagination(req.query);
     const filter = {};
@@ -660,8 +1178,8 @@ app.get("/api/receipts", authMiddleware, adminMiddleware, async (req, res) => {
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// Admin — confirm or reject receipt (also called by Discord bot via this endpoint)
-app.put("/api/receipts/:receiptId/status", authMiddleware, adminMiddleware, async (req, res) => {
+// Admin/Staff — confirm or reject receipt (also called by Discord bot via this endpoint)
+app.put("/api/receipts/:receiptId/status", authMiddleware, authorize("confirm_receipts"), async (req, res) => {
   try {
     const { status } = req.body; // "confirmed" or "rejected"
     if (!["confirmed", "rejected"].includes(status)) return res.status(400).json({ message: "Invalid status" });
@@ -672,11 +1190,11 @@ app.put("/api/receipts/:receiptId/status", authMiddleware, adminMiddleware, asyn
     receipt.confirmedAt = new Date();
     await receipt.save();
 
-    // Update order status too
+    // Update order status too (via helpers to adjust salesCount and stock)
     if (status === "confirmed") {
-      await Order.findByIdAndUpdate(receipt.order, { status: "paid" });
+      await completeOrder(receipt.order);
     } else if (status === "rejected") {
-      await Order.findByIdAndUpdate(receipt.order, { status: "cancelled" });
+      await cancelOrder(receipt.order);
     }
 
     // Notify Discord
@@ -690,6 +1208,7 @@ app.put("/api/receipts/:receiptId/status", authMiddleware, adminMiddleware, asyn
       }],
     });
 
+    await logActivity(req.user._id, "RECEIPT_CONFIRM", `Receipt ${receipt.receiptId} status set to ${status}`, req);
     res.json({ receipt });
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
@@ -716,8 +1235,12 @@ app.put("/api/bot/receipt/:receiptId", async (req, res) => {
     if (!receipt) return res.status(404).json({ message: "Receipt not found" });
     receipt.status = status; receipt.confirmedAt = new Date();
     await receipt.save();
-    if (status === "confirmed") await Order.findByIdAndUpdate(receipt.order, { status: "paid" });
-    else await Order.findByIdAndUpdate(receipt.order, { status: "cancelled" });
+    
+    if (status === "confirmed") {
+      await completeOrder(receipt.order);
+    } else {
+      await cancelOrder(receipt.order);
+    }
     res.json({ receipt, message: `Receipt ${status}` });
   } catch (e) { res.status(500).json({ message: e.message }); }
 });

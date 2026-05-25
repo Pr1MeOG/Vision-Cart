@@ -34,6 +34,14 @@ const Icon = ({ name, size = 20, ...props }) => {
     crown: <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" {...props}><path d="M2 19h20v3H2v-3zM3.3 5.5l5.1 5.1L12 4l3.6 6.6L20.7 5.5 22 14H2l1.3-8.5z"/></svg>,
     arrowUp: <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2.5" {...props}><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>,
     shop: <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" {...props}><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>,
+    analytics: <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" {...props}><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>,
+    add: <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" {...props}><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
+    category: <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" {...props}><path d="M12 2 2 7l10 5 10-5Z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>,
+    coupon: <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" {...props}><path d="M15 5 9 19"/><rect width="20" height="14" x="2" y="5" rx="2"/><circle cx="8" cy="10" r="1"/><circle cx="16" cy="14" r="1"/></svg>,
+    announcement: <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" {...props}><path d="M12 12h.01"/><path d="M14.5 2H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 0 0-7Z"/><path d="M19 12a3 3 0 1 0-6 0 3 3 0 0 0 6 0Z"/><path d="M2 12a3 3 0 1 0 6 0 3 3 0 0 0-6 0Z"/><path d="M12 9v13"/></svg>,
+    staff: <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" {...props}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+    upi: <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" {...props}><rect width="20" height="12" x="2" y="6" rx="2"/><path d="M12 12h.01"/><path d="M17 12h.01"/><path d="M7 12h.01"/></svg>,
+    sparkles: <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" {...props}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z"/></svg>
   };
   return icons[name] || null;
 };
@@ -207,7 +215,11 @@ const Navbar = ({ user, onLogin, onLogout, onAdmin, page, setPage, cartCount, ca
         {user ? (
           <>
             <div className="nav-avatar" title={user.name}>{user.avatar ? <img src={user.avatar} alt="" /> : user.name?.[0]?.toUpperCase()}</div>
-            {user.isAdmin && <button className="btn-admin-pill" onClick={onAdmin}><Icon name="lightning" size={14} /> Admin</button>}
+            {(user.isAdmin || user.role === "admin" || user.role === "staff") && (
+              <button className="btn-admin-pill" onClick={onAdmin}>
+                <Icon name="lightning" size={14} /> {user.role === "staff" ? "Staff Portal" : "Admin"}
+              </button>
+            )}
             <button className="btn-outline" onClick={onLogout}>Logout</button>
           </>
         ) : <button className="btn-primary" onClick={onLogin}>Login</button>}
@@ -457,28 +469,79 @@ const OrderChat = ({ order, onClose }) => {
 };
 
 // ─── ADMIN PANEL — Full Page ──────────────────────────────
-const AdminPanel = ({ onClose }) => {
-  const [tab, setTab] = useState("add");
-  const [products, setProducts] = useState([]); const [orders, setOrders] = useState([]); const [admins, setAdmins] = useState([]); const [receipts, setReceipts] = useState([]);
-  const [form, setForm] = useState({ name: "", description: "", price: "", stock: 10 });
-  const [mediaFile, setMediaFile] = useState(null); const [mediaPreview, setMediaPreview] = useState(null); const [mediaType, setMediaType] = useState("image");
-  const [loading, setLoading] = useState(false); const [msg, setMsg] = useState("");
+const AdminPanel = ({ user, onClose }) => {
+  const [tab, setTab] = useState("analytics");
+  const [products, setProducts] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [admins, setAdmins] = useState([]);
+  const [receipts, setReceipts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
+  const [coupons, setCoupons] = useState([]);
+  const [staffList, setStaffList] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
+  const [form, setForm] = useState({ name: "", description: "", price: "", stock: 10, category: "Uncategorized" });
+  const [mediaFile, setMediaFile] = useState(null);
+  const [mediaPreview, setMediaPreview] = useState(null);
+  const [mediaType, setMediaType] = useState("image");
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState("");
+
   const [upiForm, setUpiForm] = useState({ upiId: "", upiName: "", qrImage: "" });
-  const [upiMsg, setUpiMsg] = useState(""); const [upiLoading, setUpiLoading] = useState(false);
+  const [upiMsg, setUpiMsg] = useState("");
+  const [upiLoading, setUpiLoading] = useState(false);
+
   const [newAdmin, setNewAdmin] = useState({ name: "", email: "", password: "" });
   const [adminMsg, setAdminMsg] = useState("");
+
+  const [catForm, setCatForm] = useState({ name: "", description: "" });
+  const [catMsg, setCatMsg] = useState("");
+
+  const [annForm, setAnnForm] = useState({ title: "", content: "", isActive: true });
+  const [annMsg, setAnnMsg] = useState("");
+
+  const [couponForm, setCouponForm] = useState({ code: "", discountPercent: 10, isActive: true, expiresAt: "" });
+  const [couponMsg, setCouponMsg] = useState("");
+
+  const [newStaff, setNewStaff] = useState({ name: "", email: "", password: "", permissions: ["view_orders", "update_orders", "view_receipts"] });
+  const [staffMsg, setStaffMsg] = useState("");
+
   const [adminError, setAdminError] = useState("");
-  const [statusFilter, setStatusFilter] = useState("pending"); const [chatOrder, setChatOrder] = useState(null);
+  const [statusFilter, setStatusFilter] = useState("pending");
+  const [chatOrder, setChatOrder] = useState(null);
   const fileRef = useRef(null);
 
+  // Vision AI States
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiMessages, setAiMessages] = useState([
+    { sender: "ai", text: "🤖 **Hello! I am Vision AI**, your store management assistant.\n\nI can explain analytics, recommend price optimizations, draft product copy, help write announcements, and summarize revenue trends.\n\nWhat would you like to ask?" }
+  ]);
+  const [aiInput, setAiInput] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const aiBottomRef = useRef(null);
+
   useEffect(() => {
-    api("/products").then(p => { if (!p.error) setProducts(safeArr(p.products)); }).catch(e => { console.error("Admin init fetch /products:", e); setAdminError("Failed to load products"); });
-    api("/upi").then(u => { if (!u.error && u.upiId) setUpiForm(prev => ({ ...prev, upiId: u.upiId, upiName: u.upiName, qrImage: u.qrImage || "" })); }).catch(e => console.error("Admin init fetch /upi:", e));
+    // Initial data fetch
+    fetchTab("analytics");
+    api("/categories").then(c => { if (!c.error) setCategories(safeArr(c.categories)); }).catch(() => {});
+    api("/upi").then(u => { if (!u.error && u.upiId) setUpiForm(prev => ({ ...prev, upiId: u.upiId, upiName: u.upiName, qrImage: u.qrImage || "" })); }).catch(() => {});
   }, []);
 
   const fetchTab = useCallback(async (activeTab) => {
     try {
+      setAdminError("");
       switch (activeTab) {
+        case "analytics": {
+          setAnalyticsLoading(true);
+          const an = await api("/analytics/dashboard");
+          setAnalyticsLoading(false);
+          if (!an.error) setAnalytics(an);
+          else setAdminError("Failed to load analytics dashboard.");
+          break;
+        }
         case "products": {
           const p = await api("/products");
           if (!p.error) setProducts(safeArr(p.products));
@@ -494,17 +557,51 @@ const AdminPanel = ({ onClose }) => {
           if (!r.error) setReceipts(safeArr(r.receipts));
           break;
         }
+        case "categories": {
+          const c = await api("/categories");
+          if (!c.error) setCategories(safeArr(c.categories));
+          break;
+        }
+        case "announcements": {
+          const a = await api("/announcements/all");
+          if (!a.error) setAnnouncements(safeArr(a.announcements));
+          break;
+        }
+        case "coupons": {
+          const cp = await api("/coupons/all");
+          if (!cp.error) setCoupons(safeArr(cp.coupons));
+          break;
+        }
+        case "staff": {
+          const st = await api("/staff");
+          if (!st.error) setStaffList(safeArr(st.staff));
+          break;
+        }
         case "admins": {
           const a = await api("/admins");
           if (!a.error) setAdmins(safeArr(a.admins));
           break;
         }
+        case "logs": {
+          const l = await api("/logs");
+          if (!l.error) setLogs(safeArr(l.logs));
+          break;
+        }
         default: break;
       }
-    } catch (e) { console.error("fetchTab error:", activeTab, e); setAdminError(`Failed to load ${activeTab}`); }
+    } catch (e) {
+      console.error("fetchTab error:", activeTab, e);
+      setAdminError(`Failed to load ${activeTab}`);
+    }
   }, []);
 
-  useEffect(() => { if (tab !== "add" && tab !== "upi") fetchTab(tab); }, [tab, fetchTab]);
+  useEffect(() => {
+    if (tab !== "add" && tab !== "upi") fetchTab(tab);
+  }, [tab, fetchTab]);
+
+  useEffect(() => {
+    aiBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [aiMessages, aiOpen]);
 
   const handleMediaSelect = (e) => {
     const file = e.target.files[0]; if (!file) return;
@@ -523,7 +620,7 @@ const AdminPanel = ({ onClose }) => {
         if (up.url) { imageUrl = up.mediaType === "image" ? up.url : ""; mediaUrl = up.url; mType = up.mediaType; }
       }
       await api("/products", { method: "POST", body: JSON.stringify({ ...form, price: Number(form.price), imageUrl, mediaUrl, mediaType: mType }) });
-      setForm({ name: "", description: "", price: "", stock: 10 }); setMediaFile(null); setMediaPreview(null);
+      setForm({ name: "", description: "", price: "", stock: 10, category: "Uncategorized" }); setMediaFile(null); setMediaPreview(null);
       setMsg("✅ Product added!"); await fetchTab("products");
     } catch (e) { console.error("addProduct error:", e); setMsg("❌ Failed to add product"); }
     setLoading(false);
@@ -547,6 +644,79 @@ const AdminPanel = ({ onClose }) => {
 
   const removeAdmin = async (id) => { try { await api(`/admins/${id}`, { method: "DELETE" }); await fetchTab("admins"); } catch (e) { console.error("removeAdmin error:", e); } };
 
+  // Category Actions
+  const saveCategory = async () => {
+    if (!catForm.name.trim()) return setCatMsg("❌ Category name is required!");
+    try {
+      const d = await api("/categories", { method: "POST", body: JSON.stringify(catForm) });
+      if (d.error) return setCatMsg("❌ " + (d.message || "Failed to add category"));
+      setCatMsg("✅ Category added!"); setCatForm({ name: "", description: "" }); await fetchTab("categories");
+    } catch (e) { setCatMsg("❌ Failed to save category"); }
+    setTimeout(() => setCatMsg(""), 3000);
+  };
+  const deleteCategory = async (id) => { try { await api(`/categories/${id}`, { method: "DELETE" }); await fetchTab("categories"); } catch (e) {} };
+
+  // Announcement Actions
+  const saveAnnouncement = async () => {
+    if (!annForm.title.trim()) return setAnnMsg("❌ Announcement title is required!");
+    try {
+      const d = await api("/announcements", { method: "POST", body: JSON.stringify(annForm) });
+      if (d.error) return setAnnMsg("❌ " + (d.message || "Failed to save banner"));
+      setAnnMsg("✅ Announcement created!"); setAnnForm({ title: "", content: "", isActive: true }); await fetchTab("announcements");
+    } catch (e) { setAnnMsg("❌ Failed to save announcement"); }
+    setTimeout(() => setAnnMsg(""), 3000);
+  };
+  const toggleAnnouncement = async (ann) => {
+    try {
+      await api(`/announcements/${ann._id}`, { method: "PUT", body: JSON.stringify({ isActive: !ann.isActive }) });
+      await fetchTab("announcements");
+    } catch (e) {}
+  };
+  const deleteAnnouncement = async (id) => { try { await api(`/announcements/${id}`, { method: "DELETE" }); await fetchTab("announcements"); } catch (e) {} };
+
+  // Coupon Actions
+  const saveCoupon = async () => {
+    if (!couponForm.code.trim()) return setCouponMsg("❌ Coupon code is required!");
+    try {
+      const d = await api("/coupons", { method: "POST", body: JSON.stringify(couponForm) });
+      if (d.error) return setCouponMsg("❌ " + (d.message || "Failed to save coupon"));
+      setCouponMsg("✅ Coupon code created!"); setCouponForm({ code: "", discountPercent: 10, isActive: true, expiresAt: "" }); await fetchTab("coupons");
+    } catch (e) { setCouponMsg("❌ Failed to save coupon"); }
+    setTimeout(() => setCouponMsg(""), 3000);
+  };
+  const toggleCoupon = async (cp) => {
+    try {
+      await api(`/coupons/${cp._id}`, { method: "PUT", body: JSON.stringify({ isActive: !cp.isActive }) });
+      await fetchTab("coupons");
+    } catch (e) {}
+  };
+  const deleteCoupon = async (id) => { try { await api(`/coupons/${id}`, { method: "DELETE" }); await fetchTab("coupons"); } catch (e) {} };
+
+  // Staff Actions
+  const addStaff = async () => {
+    if (!newStaff.name.trim() || !newStaff.email.trim() || !newStaff.password.trim())
+      return setStaffMsg("❌ Name, email and password are required!");
+    try {
+      const d = await api("/staff", { method: "POST", body: JSON.stringify(newStaff) });
+      if (d.error) return setStaffMsg("❌ " + (d.message || "Failed to create staff"));
+      setStaffMsg("✅ Staff account created!"); setNewStaff({ name: "", email: "", password: "", permissions: ["view_orders", "update_orders", "view_receipts"] }); await fetchTab("staff");
+    } catch (e) { setStaffMsg("❌ Failed to save staff"); }
+    setTimeout(() => setStaffMsg(""), 3000);
+  };
+  const updateStaffPermissions = async (id, perms) => {
+    try {
+      await api(`/staff/${id}`, { method: "PUT", body: JSON.stringify({ permissions: perms }) });
+      await fetchTab("staff");
+    } catch (e) {}
+  };
+  const removeStaff = async (id) => {
+    try {
+      await api(`/staff/${id}`, { method: "DELETE" });
+      await fetchTab("staff");
+    } catch (e) {}
+  };
+
+  // UPI Settings
   const saveUpi = async () => {
     if (!upiForm.upiId || !upiForm.upiName) return setUpiMsg("UPI ID and name required!");
     setUpiLoading(true);
@@ -563,228 +733,798 @@ const AdminPanel = ({ onClose }) => {
     const reader = new FileReader(); reader.onload = () => setUpiForm(f => ({ ...f, qrImage: reader.result })); reader.readAsDataURL(file);
   };
 
+  // Vision AI Messages Send
+  const sendAiMessage = async (text) => {
+    if (!text?.trim() || aiLoading) return;
+    const userMsg = { sender: "user", text: text.trim() };
+    setAiMessages(prev => [...prev, userMsg]);
+    setAiInput("");
+    setAiLoading(true);
+    
+    try {
+      const d = await api("/ai/chat", {
+        method: "POST",
+        body: JSON.stringify({ message: text, chatHistory: aiMessages.slice(1) })
+      });
+      if (d.reply) {
+        setAiMessages(prev => [...prev, { sender: "ai", text: d.reply }]);
+      } else {
+        setAiMessages(prev => [...prev, { sender: "ai", text: "⚠️ **Failed to connect to Vision AI.** Check connection or API keys." }]);
+      }
+    } catch (e) {
+      setAiMessages(prev => [...prev, { sender: "ai", text: "❌ **Error contacting Gemini backend routing.**" }]);
+    }
+    setAiLoading(false);
+  };
+
   const safeProds = safeArr(products);
   const safeOrders = safeArr(orders);
   const safeRecs = safeArr(receipts);
   const safeAdmins = safeArr(admins);
+  const safeCats = safeArr(categories);
+  const safeAnns = safeArr(announcements);
+  const safeCoupons = safeArr(coupons);
+  const safeStaff = safeArr(staffList);
+  const safeLogs = safeArr(logs);
+
   const filteredOrders = statusFilter === "all" ? safeOrders : safeOrders.filter(o => o && o.status === statusFilter);
   const pendingCount = safeOrders.filter(o => o && o.status === "pending").length;
   const pendingRecs = safeRecs.filter(r => r && r.status === "pending").length;
-  const TABS = ["add", "products", "orders", "receipts", "upi", "admins"];
+  const lowStockCount = safeProds.filter(p => p.stock <= 5).length;
+
+  const allTabs = [
+    { id: "analytics", label: "Dashboard", icon: "analytics", permission: "view_analytics" },
+    { id: "add", label: "✚ Add Product", icon: "add", permission: "manage_products" },
+    { id: "products", label: "Products", icon: "shop", permission: "manage_products" },
+    { id: "categories", label: "Categories", icon: "category", permission: "manage_categories" },
+    { id: "orders", label: "Orders", icon: "package", permission: "view_orders" },
+    { id: "receipts", label: "Receipts", icon: "receipt", permission: "view_receipts" },
+    { id: "coupons", label: "Coupons", icon: "coupon", permission: "manage_coupons" },
+    { id: "announcements", label: "Banners", icon: "announcement", permission: "manage_announcements" },
+    { id: "upi", label: "UPI Settings", icon: "upi", adminOnly: true },
+    { id: "staff", label: "Staff Accounts", icon: "staff", adminOnly: true },
+    { id: "admins", label: "Administrators", icon: "crown", adminOnly: true },
+    { id: "logs", label: "Activity Logs", icon: "receipt", adminOnly: true },
+  ];
+
+  const isAdmin = user?.role === "admin" || user?.isAdmin;
+  const TABS = allTabs.filter(t => {
+    if (isAdmin) return true;
+    if (t.adminOnly) return false;
+    return user?.permissions?.includes(t.permission);
+  });
+
+  const availablePermissions = [
+    { id: "view_analytics", label: "View Analytics" },
+    { id: "manage_products", label: "Manage Products" },
+    { id: "manage_categories", label: "Manage Categories" },
+    { id: "view_orders", label: "View Orders" },
+    { id: "update_orders", label: "Update Orders & Chat" },
+    { id: "view_receipts", label: "View Receipts" },
+    { id: "confirm_receipts", label: "Confirm/Reject Receipts" },
+    { id: "manage_coupons", label: "Manage Coupons" },
+    { id: "manage_announcements", label: "Manage Announcements" },
+  ];
+
+  const formatText = (text) => {
+    // Simple bold markdown translation for clean chat bubbles
+    return text.split("\n").map((line, idx) => {
+      let formattedLine = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      formattedLine = formattedLine.replace(/\*(.*?)\*/g, '<em>$1</em>');
+      return <p key={idx} dangerouslySetInnerHTML={{ __html: formattedLine || "&nbsp;" }} style={{ marginBottom: 4 }} />;
+    });
+  };
 
   return (
     <>
-      {/* ✅ FIX: Full page admin panel instead of side drawer */}
       <motion.div className="admin-fullpage" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }} transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}>
         <div className="admin-fullpage-header">
           <div className="admin-title-wrap">
             <img src="/banner.gif" alt="VC" style={{ height: 36, borderRadius: 8 }} />
-            <h1><Icon name="lightning" size={22} /> Admin Panel</h1>
+            <h1><Icon name="lightning" size={22} /> {isAdmin ? "Admin Portal" : "Staff Portal"}</h1>
           </div>
           <button className="btn-outline" onClick={onClose}>← Back to Store</button>
         </div>
 
-        <div className="admin-fullpage-tabs">
-          {TABS.map(t => (
-            <button key={t} className={`admin-tab-btn ${tab === t ? "active" : ""}`} onClick={() => setTab(t)}>
-              {t === "add" ? "✚ Add Product"
-               : t === "products" ? <span><Icon name="shop" size={14} /> Products ({safeProds.length})</span>
-               : t === "orders" ? <span><Icon name="package" size={14} /> Orders {pendingCount > 0 && <span className="tab-badge">{pendingCount}</span>}</span>
-               : t === "receipts" ? <span><Icon name="receipt" size={14} /> Receipts {pendingRecs > 0 && <span className="tab-badge">{pendingRecs}</span>}</span>
-               : t === "upi" ? <span><Icon name="cart" size={14} /> UPI Settings</span>
-               : <span><Icon name="crown" size={14} /> Admins ({safeAdmins.length})</span>}
-            </button>
-          ))}
-        </div>
-
         <div className="admin-fullpage-content">
-
           {adminError && <div className="admin-msg error" style={{ marginBottom: 16 }}>⚠️ {adminError} <button onClick={() => setAdminError("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", marginLeft: 12, fontWeight: 700 }}>✕</button></div>}
 
-          {/* ADD PRODUCT */}
-          {tab === "add" && (
-            <div className="admin-form-wide">
-              <h2 className="admin-section-title">Add New Product</h2>
-              {msg && <div className="admin-msg">{msg}</div>}
-              <div className="admin-form-grid">
-                <div className="admin-form-left">
-                  <label>Product Name *</label>
-                  <input placeholder="e.g. Premium Gaming Chair" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-                  <label>Description</label>
-                  <textarea placeholder="Describe your product..." value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={4} />
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <div><label>Price (₹) *</label><input type="number" placeholder="999" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} /></div>
-                    <div><label>Stock</label><input type="number" placeholder="10" value={form.stock} onChange={e => setForm({ ...form, stock: e.target.value })} /></div>
-                  </div>
-                </div>
-                <div className="admin-form-right">
-                  <label>Product Image / Video</label>
-                  <input ref={fileRef} type="file" accept="image/*,video/*" onChange={handleMediaSelect} style={{ display: "none" }} />
-                  <div className="media-upload-box" onClick={() => fileRef.current.click()}>
-                    {mediaPreview ? (
-                      mediaType === "video"
-                        ? <video src={mediaPreview} style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 8 }} muted controls />
-                        : <img src={mediaPreview} style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 8, objectFit: "cover" }} alt="preview" />
-                    ) : (
-                      <div className="media-upload-placeholder">
-                        <span style={{ fontSize: "2.5rem" }}>📁</span>
-                        <p>Click to upload image or video</p>
-                        <p style={{ fontSize: "0.75rem", opacity: 0.6 }}>JPG, PNG, GIF, MP4, WebM — max 50MB</p>
-                      </div>
-                    )}
-                  </div>
-                  {mediaFile && (
-                    <button onClick={() => { setMediaFile(null); setMediaPreview(null); }} style={{ marginTop: 8, background: "none", color: "var(--pink)", border: "none", cursor: "pointer", fontSize: "0.82rem" }}>✕ Remove</button>
-                  )}
-                </div>
-              </div>
-              <button className="btn-primary" style={{ padding: "14px 40px", fontSize: "1rem", marginTop: 8 }} onClick={addProduct} disabled={loading}>
-                {loading ? <span className="spinner" /> : "Add Product"}
-              </button>
+          {TABS.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "100px 20px" }}>
+              <h2 style={{ color: "var(--text-muted)", marginBottom: 12 }}>⚠️ Access Restricted</h2>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>You do not have any permissions assigned to this staff account. Please contact an administrator to request access configurations.</p>
             </div>
-          )}
-
-          {/* PRODUCTS */}
-          {tab === "products" && (
-            <div>
-              <h2 className="admin-section-title">{safeProds.length} Products</h2>
-              <div className="admin-products-grid">
-                {safeProds.length === 0 ? <p className="empty-state">No products yet!</p> : safeProds.map(p => p && (
-                  <motion.div key={p._id} className="admin-product-card" layout>
-                    {p.mediaType === "video"
-                      ? <video src={p.mediaUrl} style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: "10px 10px 0 0" }} muted />
-                      : <img src={p.imageUrl || p.mediaUrl || "/placeholder.png"} alt={p.name} style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: "10px 10px 0 0" }} />}
-                    <div style={{ padding: 12 }}>
-                      <strong style={{ display: "block", marginBottom: 4 }}>{p.name}</strong>
-                      <span style={{ color: "var(--pink2)", fontWeight: 700 }}>₹{p.price?.toLocaleString("en-IN")}</span>
-                      <button className="btn-delete" onClick={() => deleteProduct(p._id)} style={{ display: "block", width: "100%", marginTop: 10 }}>Delete</button>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ORDERS */}
-          {tab === "orders" && (
-            <div>
-              <h2 className="admin-section-title">Orders</h2>
-              <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-                {["all", "pending", "paid", "cancelled"].map(s => (
-                  <button key={s} onClick={() => setStatusFilter(s)} style={{ padding: "7px 16px", borderRadius: 8, fontSize: "0.85rem", fontWeight: 600, background: statusFilter === s ? "var(--grad)" : "rgba(255,255,255,0.06)", color: "var(--text)", border: "none", cursor: "pointer" }}>
-                    {s.charAt(0).toUpperCase() + s.slice(1)}{s === "pending" && pendingCount > 0 ? ` (${pendingCount})` : ""}
+          ) : (
+            <div className="admin-dashboard-layout">
+              {/* Sidebar navigation */}
+              <div className="sidebar-nav">
+                {TABS.map(t => (
+                  <button key={t.id} className={`sidebar-btn ${tab === t.id ? "active" : ""}`} onClick={() => setTab(t.id)}>
+                    <Icon name={t.icon} size={16} /> {t.label}
                   </button>
                 ))}
               </div>
-              <div className="admin-orders-list">
-                {!filteredOrders || filteredOrders.length === 0 ? <p className="empty-state">No orders!</p> : filteredOrders.map(o => o && (
-                  <div key={o._id} className="admin-order-card">
-                    <div className="order-card-left">
-                      <strong>{o.user?.name || "Guest"}</strong>
-                      <span>{o.user?.email}</span>
-                      <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-                        {["pending", "paid", "cancelled"].map(s => (
-                          <button key={s} onClick={() => updateOrderStatus(o._id, s)} style={{ padding: "4px 12px", borderRadius: 6, fontSize: "0.78rem", fontWeight: 700, cursor: "pointer", border: "none", background: o.status === s ? (s === "paid" ? "#22c55e" : s === "cancelled" ? "#ef4444" : "var(--grad)") : "rgba(255,255,255,0.08)", color: o.status === s ? "white" : "var(--text-muted)" }}>{s}</button>
-                        ))}
+
+              {/* Content Panel */}
+              <div className="dashboard-content-area" style={{ flex: 1, minWidth: 0 }}>
+
+                {/* 1. ANALYTICS TAB */}
+                {tab === "analytics" && (
+                  <div>
+                    <h2 className="admin-section-title">Store Dashboard Overview</h2>
+                    {analyticsLoading && (
+                      <div style={{ textAlign: "center", padding: "80px 0" }}>
+                        <span className="spinner" style={{ width: 40, height: 40 }} />
+                        <p style={{ marginTop: 12, color: "var(--text-muted)", fontSize: "0.9rem" }}>Loading live analytics data...</p>
+                      </div>
+                    )}
+                    {!analyticsLoading && analytics && (
+                      <>
+                        <div className="analytics-grid">
+                          <div className="metric-card">
+                            <div className="metric-header">
+                              <span className="metric-title">Total Sales Revenue</span>
+                              <div className="metric-icon-wrap"><Icon name="bag" size={18} /></div>
+                            </div>
+                            <span className="metric-value gradient-text">₹{analytics.revenue.total?.toLocaleString("en-IN")}</span>
+                            <span className="metric-change up">₹{analytics.revenue.today?.toLocaleString("en-IN")} received today</span>
+                          </div>
+
+                          <div className="metric-card">
+                            <div className="metric-header">
+                              <span className="metric-title">Weekly / Monthly</span>
+                              <div className="metric-icon-wrap"><Icon name="analytics" size={18} /></div>
+                            </div>
+                            <span className="metric-value">₹{analytics.revenue.weekly?.toLocaleString("en-IN")}</span>
+                            <span className="metric-change neutral">₹{analytics.revenue.monthly?.toLocaleString("en-IN")} last 30 days</span>
+                          </div>
+
+                          <div className="metric-card">
+                            <div className="metric-header">
+                              <span className="metric-title">Orders Activity</span>
+                              <div className="metric-icon-wrap"><Icon name="package" size={18} /></div>
+                            </div>
+                            <span className="metric-value">{analytics.orders.total}</span>
+                            <span className="metric-change neutral">{analytics.orders.completed} completed · {analytics.orders.pending} pending</span>
+                          </div>
+
+                          <div className="metric-card">
+                            <div className="metric-header">
+                              <span className="metric-title">Conversion Rate</span>
+                              <div className="metric-icon-wrap"><Icon name="lightning" size={18} /></div>
+                            </div>
+                            <span className="metric-value">{analytics.conversionRate}%</span>
+                            <span className="metric-change up">{analytics.users.new} new users registered this week</span>
+                          </div>
+                        </div>
+
+                        {/* Chart panel */}
+                        <div className="chart-container-premium">
+                          <div className="chart-header">
+                            <h3>Store Performance (Last 7 Days)</h3>
+                            <div className="chart-legend">
+                              <div className="legend-item"><span className="legend-dot revenue" /> <span>Revenue (₹)</span></div>
+                              <div className="legend-item"><span className="legend-dot orders" /> <span>Orders count</span></div>
+                            </div>
+                          </div>
+                          <div className="css-bar-chart">
+                            {analytics.graphData?.map((g, idx) => {
+                              const maxRev = Math.max(...analytics.graphData.map(d => d.revenue), 1);
+                              const maxOrd = Math.max(...analytics.graphData.map(d => d.orders), 1);
+                              const revPct = (g.revenue / maxRev) * 100;
+                              const ordPct = (g.orders / maxOrd) * 100;
+                              const formattedDate = new Date(g.date).toLocaleDateString("en-IN", { month: "short", day: "numeric" });
+                              return (
+                                <div key={idx} className="css-chart-bar-wrap">
+                                  <div className="css-chart-bars">
+                                    <div className="css-chart-bar rev" style={{ height: `${revPct}%` }} />
+                                    <div className="css-chart-bar ord" style={{ height: `${ordPct}%` }} />
+                                  </div>
+                                  <span className="css-chart-label">{formattedDate}</span>
+                                  <div className="css-chart-value-hint">
+                                    <strong>₹{g.revenue.toLocaleString("en-IN")}</strong><br />
+                                    <span>{g.orders} orders placed</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Stats tables and breakdown grids */}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", flexWrap: "wrap", marginTop: 24 }}>
+                          
+                          {/* Top Products */}
+                          <div className="table-wrapper" style={{ padding: 20 }}>
+                            <h3 style={{ marginBottom: 16, fontFamily: "Syne", fontSize: "1.1rem" }}>🏆 Top Best-Sellers</h3>
+                            {analytics.products.bestSellers?.length === 0 ? <p className="empty-state">No sales tracked yet.</p> : (
+                              <table className="premium-table">
+                                <thead>
+                                  <tr>
+                                    <th>Product Name</th>
+                                    <th style={{ textAlign: "right" }}>Price</th>
+                                    <th style={{ textAlign: "right" }}>Sales</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {analytics.products.bestSellers.map(p => (
+                                    <tr key={p._id}>
+                                      <td>{p.name}</td>
+                                      <td style={{ textAlign: "right" }}>₹{p.price?.toLocaleString()}</td>
+                                      <td style={{ textAlign: "right", color: "var(--pink2)", fontWeight: 700 }}>{p.salesCount || 0} items</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            )}
+                          </div>
+
+                          {/* Low Performing Products / Views */}
+                          <div className="table-wrapper" style={{ padding: 20 }}>
+                            <h3 style={{ marginBottom: 16, fontFamily: "Syne", fontSize: "1.1rem" }}>🔍 Most Viewed Items</h3>
+                            {analytics.products.mostViewed?.length === 0 ? <p className="empty-state">No product views logged.</p> : (
+                              <table className="premium-table">
+                                <thead>
+                                  <tr>
+                                    <th>Product Name</th>
+                                    <th style={{ textAlign: "right" }}>Views count</th>
+                                    <th style={{ textAlign: "right" }}>Sales count</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {analytics.products.mostViewed.map(p => (
+                                    <tr key={p._id}>
+                                      <td>{p.name}</td>
+                                      <td style={{ textAlign: "right", color: "var(--cyber-blue)", fontWeight: 700 }}>{p.views || 0} views</td>
+                                      <td style={{ textAlign: "right" }}>{p.salesCount || 0} sales</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Category Sales Breakdown */}
+                        <div className="table-wrapper" style={{ padding: 20, marginTop: 10 }}>
+                          <h3 style={{ marginBottom: 16, fontFamily: "Syne", fontSize: "1.1rem" }}>📁 Sales Breakdown by Category</h3>
+                          {analytics.categoryStats?.length === 0 ? <p className="empty-state">No categories configured.</p> : (
+                            <table className="premium-table">
+                              <thead>
+                                <tr>
+                                  <th>Category slug</th>
+                                  <th>Products count</th>
+                                  <th style={{ textAlign: "right" }}>Accumulated Sales</th>
+                                  <th style={{ textAlign: "right" }}>Accumulated Views</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {analytics.categoryStats.map((c, idx) => (
+                                  <tr key={idx}>
+                                    <td style={{ fontWeight: 700 }}>{c._id || "Uncategorized"}</td>
+                                    <td>{c.count} products</td>
+                                    <td style={{ textAlign: "right", color: "var(--pink2)", fontWeight: 700 }}>{c.totalSales} items sold</td>
+                                    <td style={{ textAlign: "right" }}>{c.totalViews} views</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* 2. ADD PRODUCT TAB */}
+                {tab === "add" && (
+                  <div className="admin-form-wide">
+                    <h2 className="admin-section-title">Add New Store Item</h2>
+                    {msg && <div className="admin-msg">{msg}</div>}
+                    <div className="admin-form-grid">
+                      <div className="admin-form-left">
+                        <label>Product Title *</label>
+                        <input placeholder="e.g. Cyberpunk Mech Keycap" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+                        <label>Product Description</label>
+                        <textarea placeholder="Write descriptive copywriting for the product page..." value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={4} />
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                          <div><label>Price (INR) *</label><input type="number" placeholder="499" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} /></div>
+                          <div><label>Initial Stock *</label><input type="number" placeholder="10" value={form.stock} onChange={e => setForm({ ...form, stock: e.target.value })} /></div>
+                        </div>
+                        <label>Product Category</label>
+                        <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} style={{ background: "rgba(255,255,255,0.05)", color: "white", padding: 12, borderRadius: 12, border: "1px solid var(--border)", outline: "none" }}>
+                          <option value="Uncategorized">Uncategorized</option>
+                          {safeCats.map(c => <option key={c._id} value={c.name}>{c.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="admin-form-right">
+                        <label>Product Image / Showcase Video</label>
+                        <input ref={fileRef} type="file" accept="image/*,video/*" onChange={handleMediaSelect} style={{ display: "none" }} />
+                        <div className="media-upload-box" onClick={() => fileRef.current.click()}>
+                          {mediaPreview ? (
+                            mediaType === "video"
+                              ? <video src={mediaPreview} style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 8 }} muted controls />
+                              : <img src={mediaPreview} style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 8, objectFit: "cover" }} alt="preview" />
+                          ) : (
+                            <div className="media-upload-placeholder">
+                              <span style={{ fontSize: "2.5rem" }}>📁</span>
+                              <p>Select product visual file</p>
+                              <p style={{ fontSize: "0.75rem", opacity: 0.6 }}>JPG, PNG, GIF, MP4, WebM — max 50MB</p>
+                            </div>
+                          )}
+                        </div>
+                        {mediaFile && (
+                          <button onClick={() => { setMediaFile(null); setMediaPreview(null); }} style={{ marginTop: 8, background: "none", color: "var(--pink)", border: "none", cursor: "pointer", fontSize: "0.82rem" }}>✕ Remove Media</button>
+                        )}
                       </div>
                     </div>
-                    <div className="order-card-right">
-                      <strong style={{ color: "var(--pink)", fontSize: "1.1rem" }}>₹{o.total?.toLocaleString("en-IN")}</strong>
-                      <span className={`order-status ${o.status}`}>{o.status}</span>
-                      <button onClick={() => setChatOrder(o)} className="btn-chat"><Icon name="chat" size={14} /> Chat</button>
+                    <button className="btn-primary" style={{ padding: "14px 40px", fontSize: "1rem", marginTop: 8 }} onClick={addProduct} disabled={loading}>
+                      {loading ? <span className="spinner" /> : "Save New Product"}
+                    </button>
+                  </div>
+                )}
+
+                {/* 3. PRODUCTS LIST TAB */}
+                {tab === "products" && (
+                  <div>
+                    <h2 className="admin-section-title">Catalog Inventory ({safeProds.length} Products)</h2>
+                    {lowStockCount > 0 && <div className="admin-msg error" style={{ marginBottom: 20, textAlign: "left" }}>⚠️ **Low Stock Alert:** {lowStockCount} products are running low in stock. Please restock items.</div>}
+                    <div className="admin-products-grid">
+                      {safeProds.length === 0 ? <p className="empty-state">No products found in the database.</p> : safeProds.map(p => p && (
+                        <motion.div key={p._id} className="admin-product-card" layout>
+                          {p.mediaType === "video"
+                            ? <video src={p.mediaUrl} style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: "10px 10px 0 0" }} muted />
+                            : <img src={p.imageUrl || p.mediaUrl || "/placeholder.png"} alt={p.name} style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: "10px 10px 0 0" }} />}
+                          <div style={{ padding: 12 }}>
+                            <strong style={{ display: "block", marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={p.name}>{p.name}</strong>
+                            <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", display: "block", marginBottom: 6 }}>Category: {p.category || "Uncategorized"}</span>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                              <span style={{ color: "var(--pink2)", fontWeight: 700 }}>₹{p.price?.toLocaleString("en-IN")}</span>
+                              <span style={{ fontSize: "0.78rem", color: p.stock <= 5 ? "#f87171" : "var(--text-muted)" }}>Stock: {p.stock}</span>
+                            </div>
+                            <button className="btn-delete" onClick={() => deleteProduct(p._id)} style={{ display: "block", width: "100%", padding: 8 }}>✕ Delete Item</button>
+                          </div>
+                        </motion.div>
+                      ))}
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
+                )}
 
-          {/* RECEIPTS */}
-          {tab === "receipts" && (
-            <div>
-              <h2 className="admin-section-title">Payment Receipts</h2>
-              <div className="admin-orders-list">
-                {safeRecs.length === 0 ? <p className="empty-state">No receipts yet!</p> : safeRecs.map(r => r && (
-                  <div key={r._id || Math.random()} className="admin-order-card">
-                    <div className="order-card-left">
-                      <strong style={{ fontFamily: "monospace", color: "var(--purple2)" }}>{r.receiptId || "—"}</strong>
-                      <span>{r.user?.name || "—"} · {r.user?.email || "—"}</span>
-                      {r.createdAt && <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>{new Date(r.createdAt).toLocaleDateString("en-IN")}</span>}
+                {/* 4. CATEGORIES TAB */}
+                {tab === "categories" && (
+                  <div>
+                    <h2 className="admin-section-title">Catalog Categories</h2>
+                    <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 24 }}>
+                      <div className="admin-form-wide">
+                        <h3>Add Category</h3>
+                        {catMsg && <div className="admin-msg">{catMsg}</div>}
+                        <label>Category Name *</label>
+                        <input placeholder="e.g. Hardware" value={catForm.name} onChange={e => setCatForm({ ...catForm, name: e.target.value })} />
+                        <label>Description</label>
+                        <textarea placeholder="Details about this group..." value={catForm.description} onChange={e => setCatForm({ ...catForm, description: e.target.value })} rows={3} />
+                        <button className="btn-primary" onClick={saveCategory} style={{ marginTop: 8 }}>Create Category</button>
+                      </div>
+                      <div className="table-wrapper">
+                        {safeCats.length === 0 ? <p className="empty-state">No categories configured yet.</p> : (
+                          <table className="premium-table">
+                            <thead>
+                              <tr>
+                                <th>Name</th>
+                                <th>Slug</th>
+                                <th>Description</th>
+                                <th style={{ textAlign: "right" }}>Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {safeCats.map(c => (
+                                <tr key={c._id}>
+                                  <td style={{ fontWeight: 700 }}>{c.name}</td>
+                                  <td><code>{c.slug}</code></td>
+                                  <td>{c.description || "—"}</td>
+                                  <td style={{ textAlign: "right" }}>
+                                    <button onClick={() => deleteCategory(c._id)} className="btn-delete" style={{ padding: "4px 8px" }}>Delete</button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
                     </div>
-                    <div className="order-card-right">
-                      {typeof r.total === "number" && <strong style={{ color: "var(--pink)", fontSize: "1.1rem" }}>₹{r.total.toLocaleString("en-IN")}</strong>}
-                      <span className={`order-status ${r.status || "pending"}`}>{r.status || "pending"}</span>
-                      {r.status === "pending" && (
-                        <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-                          <button onClick={() => confirmReceipt(r.receiptId, "confirmed")} style={{ padding: "5px 12px", borderRadius: 6, fontSize: "0.78rem", background: "#22c55e", color: "#fff", border: "none", cursor: "pointer", fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}><Icon name="check" size={12} /> Confirm</button>
-                          <button onClick={() => confirmReceipt(r.receiptId, "rejected")} style={{ padding: "5px 12px", borderRadius: 6, fontSize: "0.78rem", background: "#ef4444", color: "#fff", border: "none", cursor: "pointer", fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}><Icon name="cross" size={12} /> Reject</button>
+                  </div>
+                )}
+
+                {/* 5. ORDERS TAB */}
+                {tab === "orders" && (
+                  <div>
+                    <h2 className="admin-section-title">Customer Orders Management</h2>
+                    <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+                      {["all", "pending", "paid", "cancelled"].map(s => (
+                        <button key={s} onClick={() => setStatusFilter(s)} style={{ padding: "7px 16px", borderRadius: 8, fontSize: "0.85rem", fontWeight: 600, background: statusFilter === s ? "var(--grad)" : "rgba(255,255,255,0.06)", color: "var(--text)", border: "none", cursor: "pointer" }}>
+                          {s.charAt(0).toUpperCase() + s.slice(1)}{s === "pending" && pendingCount > 0 ? ` (${pendingCount})` : ""}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="admin-orders-list">
+                      {!filteredOrders || filteredOrders.length === 0 ? <p className="empty-state">No orders match filter.</p> : filteredOrders.map(o => o && (
+                        <div key={o._id} className="admin-order-card">
+                          <div className="order-card-left">
+                            <strong>{o.user?.name || "Guest User"}</strong>
+                            <span>{o.user?.email}</span>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8, borderLeft: "2px solid var(--border)", paddingLeft: 10 }}>
+                              {o.items?.map((item, idx) => (
+                                <span key={idx} style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>
+                                  • {item.product?.name || "Product"} × {item.qty} (₹{item.price?.toLocaleString("en-IN")})
+                                </span>
+                              ))}
+                            </div>
+                            <div style={{ display: "flex", gap: 6, marginTop: 12, flexWrap: "wrap" }}>
+                              {["pending", "paid", "cancelled"].map(s => (
+                                <button key={s} onClick={() => updateOrderStatus(o._id, s)} style={{ padding: "4px 12px", borderRadius: 6, fontSize: "0.78rem", fontWeight: 700, cursor: "pointer", border: "none", background: o.status === s ? (s === "paid" ? "#22c55e" : s === "cancelled" ? "#ef4444" : "var(--grad)") : "rgba(255,255,255,0.08)", color: o.status === s ? "white" : "var(--text-muted)" }}>{s}</button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="order-card-right">
+                            <strong style={{ color: "var(--pink)", fontSize: "1.1rem" }}>₹{o.total?.toLocaleString("en-IN")}</strong>
+                            <span className={`order-status ${o.status}`}>{o.status}</span>
+                            <button onClick={() => setChatOrder(o)} className="btn-chat" style={{ marginTop: 8 }}><Icon name="chat" size={14} /> User Chat</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 6. RECEIPTS TAB */}
+                {tab === "receipts" && (
+                  <div>
+                    <h2 className="admin-section-title">Payment Verification Receipts</h2>
+                    <div className="admin-orders-list">
+                      {safeRecs.length === 0 ? <p className="empty-state">No payment receipts uploaded yet.</p> : safeRecs.map(r => r && (
+                        <div key={r._id || Math.random()} className="admin-order-card">
+                          <div className="order-card-left">
+                            <strong style={{ fontFamily: "monospace", color: "var(--purple2)" }}>{r.receiptId || "—"}</strong>
+                            <span>Customer: {r.user?.name || "—"} · {r.user?.email || "—"}</span>
+                            {r.createdAt && <span style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: 4 }}>Date: {new Date(r.createdAt).toLocaleString("en-IN")}</span>}
+                            <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 8, paddingLeft: 10, borderLeft: "2px solid rgba(236,72,153,0.3)" }}>
+                              {r.items?.map((item, idx) => (
+                                <span key={idx} style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>{item.name} × {item.qty}</span>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="order-card-right">
+                            {typeof r.total === "number" && <strong style={{ color: "var(--pink)", fontSize: "1.1rem" }}>₹{r.total.toLocaleString("en-IN")}</strong>}
+                            <span className={`order-status ${r.status || "pending"}`}>{r.status || "pending"}</span>
+                            {r.status === "pending" && (
+                              <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+                                <button onClick={() => confirmReceipt(r.receiptId, "confirmed")} style={{ padding: "6px 12px", borderRadius: 6, fontSize: "0.78rem", background: "#22c55e", color: "#fff", border: "none", cursor: "pointer", fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}><Icon name="check" size={12} /> Confirm</button>
+                                <button onClick={() => confirmReceipt(r.receiptId, "rejected")} style={{ padding: "6px 12px", borderRadius: 6, fontSize: "0.78rem", background: "#ef4444", color: "#fff", border: "none", cursor: "pointer", fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}><Icon name="cross" size={12} /> Reject</button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 7. COUPONS TAB */}
+                {tab === "coupons" && (
+                  <div>
+                    <h2 className="admin-section-title">Discount Coupon Codes</h2>
+                    <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 24 }}>
+                      <div className="admin-form-wide">
+                        <h3>Add Coupon</h3>
+                        {couponMsg && <div className="admin-msg">{couponMsg}</div>}
+                        <label>Coupon Code *</label>
+                        <input placeholder="e.g. VISION50" value={couponForm.code} onChange={e => setCouponForm({ ...couponForm, code: e.target.value })} />
+                        <label>Discount Percentage *</label>
+                        <input type="number" min="1" max="100" placeholder="15" value={couponForm.discountPercent} onChange={e => setCouponForm({ ...couponForm, discountPercent: Number(e.target.value) })} />
+                        <label>Expires At</label>
+                        <input type="date" value={couponForm.expiresAt} onChange={e => setCouponForm({ ...couponForm, expiresAt: e.target.value })} />
+                        <button className="btn-primary" onClick={saveCoupon} style={{ marginTop: 8 }}>Save Coupon</button>
+                      </div>
+                      <div className="table-wrapper">
+                        {safeCoupons.length === 0 ? <p className="empty-state">No coupons configured yet.</p> : (
+                          <table className="premium-table">
+                            <thead>
+                              <tr>
+                                <th>Code</th>
+                                <th>Discount</th>
+                                <th>Status</th>
+                                <th>Expiry Date</th>
+                                <th style={{ textAlign: "right" }}>Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {safeCoupons.map(c => (
+                                <tr key={c._id}>
+                                  <td style={{ fontWeight: 800, color: "var(--pink2)", letterSpacing: "0.05em" }}>{c.code}</td>
+                                  <td>{c.discountPercent}% OFF</td>
+                                  <td>
+                                    <span style={{ color: c.isActive ? "#4ade80" : "#ef4444", fontWeight: 700 }}>
+                                      {c.isActive ? "Active" : "Disabled"}
+                                    </span>
+                                  </td>
+                                  <td>{c.expiresAt ? new Date(c.expiresAt).toLocaleDateString("en-IN") : "Never"}</td>
+                                  <td style={{ textAlign: "right", display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                                    <button onClick={() => toggleCoupon(c)} className="btn-chat" style={{ padding: "4px 8px" }}>Toggle</button>
+                                    <button onClick={() => deleteCoupon(c._id)} className="btn-delete" style={{ padding: "4px 8px" }}>Delete</button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 8. ANNOUNCEMENTS TAB */}
+                {tab === "announcements" && (
+                  <div>
+                    <h2 className="admin-section-title">Announcement Banners</h2>
+                    <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 24 }}>
+                      <div className="admin-form-wide">
+                        <h3>Add Banner Announcement</h3>
+                        {annMsg && <div className="admin-msg">{annMsg}</div>}
+                        <label>Title *</label>
+                        <input placeholder="e.g. Free Delivery" value={annForm.title} onChange={e => setAnnForm({ ...annForm, title: e.target.value })} />
+                        <label>Banner Body Text</label>
+                        <textarea placeholder="Describe details..." value={annForm.content} onChange={e => setAnnForm({ ...annForm, content: e.target.value })} rows={3} />
+                        <button className="btn-primary" onClick={saveAnnouncement} style={{ marginTop: 8 }}>Save Announcement</button>
+                      </div>
+                      <div className="table-wrapper">
+                        {safeAnns.length === 0 ? <p className="empty-state">No announcements created yet.</p> : (
+                          <table className="premium-table">
+                            <thead>
+                              <tr>
+                                <th>Announcement Title</th>
+                                <th>Body Content</th>
+                                <th>Status</th>
+                                <th style={{ textAlign: "right" }}>Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {safeAnns.map(a => (
+                                <tr key={a._id}>
+                                  <td style={{ fontWeight: 700 }}>{a.title}</td>
+                                  <td>{a.content || "—"}</td>
+                                  <td>
+                                    <span style={{ color: a.isActive ? "#4ade80" : "#ef4444", fontWeight: 700 }}>
+                                      {a.isActive ? "Live" : "Inactive"}
+                                    </span>
+                                  </td>
+                                  <td style={{ textAlign: "right", display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                                    <button onClick={() => toggleAnnouncement(a)} className="btn-chat" style={{ padding: "4px 8px" }}>Toggle</button>
+                                    <button onClick={() => deleteAnnouncement(a._id)} className="btn-delete" style={{ padding: "4px 8px" }}>Delete</button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 9. UPI SETTINGS TAB */}
+                {tab === "upi" && (
+                  <div className="admin-form-wide" style={{ maxWidth: 560 }}>
+                    <h2 className="admin-section-title">UPI Merchant Settings</h2>
+                    {upiMsg && <div className="admin-msg">{upiMsg}</div>}
+                    <label>UPI VPA Address *</label>
+                    <input placeholder="e.g. storename@okupi" value={upiForm.upiId} onChange={e => setUpiForm(f => ({ ...f, upiId: e.target.value }))} />
+                    <label>Merchant Display Name *</label>
+                    <input placeholder="e.g. VisionCart Private Ltd." value={upiForm.upiName} onChange={e => setUpiForm(f => ({ ...f, upiName: e.target.value }))} />
+                    <label>Custom Payment QR Image (Replaces auto-generated QR code)</label>
+                    <input type="file" accept="image/*" onChange={handleQrUpload} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", borderRadius: 10, padding: 10, color: "var(--text-muted)", cursor: "pointer" }} />
+                    {upiForm.qrImage && (
+                      <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 16 }}>
+                        <img src={upiForm.qrImage} alt="QR preview" style={{ width: 120, height: 120, borderRadius: 12, objectFit: "contain", border: "1px solid var(--border)", background: "white", padding: 8 }} />
+                        <button onClick={() => setUpiForm(f => ({ ...f, qrImage: "" }))} style={{ background: "none", color: "var(--pink)", border: "none", cursor: "pointer", fontSize: "0.85rem" }}>✕ Delete Image</button>
+                      </div>
+                    )}
+                    <button className="btn-primary" style={{ padding: "13px 32px", marginTop: 16 }} onClick={saveUpi} disabled={upiLoading}>{upiLoading ? <span className="spinner" /> : "Update payment settings"}</button>
+                  </div>
+                )}
+
+                {/* 10. STAFF PORTAL TAB */}
+                {tab === "staff" && (
+                  <div>
+                    <h2 className="admin-section-title">Staff Access Portals</h2>
+                    <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 24 }}>
+                      <div className="admin-form-wide">
+                        <h3>Add/Promote Staff</h3>
+                        {staffMsg && <div className="admin-msg">{staffMsg}</div>}
+                        <label>Staff Name *</label>
+                        <input placeholder="e.g. Alex Carter" value={newStaff.name} onChange={e => setNewStaff({ ...newStaff, name: e.target.value })} />
+                        <label>Staff Email *</label>
+                        <input placeholder="staff@visioncart.com" value={newStaff.email} onChange={e => setNewStaff({ ...newStaff, email: e.target.value })} />
+                        <label>Initial Password *</label>
+                        <input type="password" placeholder="Passphrase" value={newStaff.password} onChange={e => setNewStaff({ ...newStaff, password: e.target.value })} />
+                        <p style={{ color: "var(--text-muted)", fontSize: "0.78rem" }}>💡 If the user already has an account, they will be promoted and permissions updated.</p>
+                        <button className="btn-primary" onClick={addStaff} style={{ marginTop: 8 }}>Register Staff</button>
+                      </div>
+                      <div>
+                        {safeStaff.length === 0 ? <p className="empty-state">No staff accounts registered yet.</p> : (
+                          <div className="admin-orders-list">
+                            {safeStaff.map(st => (
+                              <div key={st._id} className="admin-order-card" style={{ flexDirection: "column", alignItems: "stretch", gap: 12 }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                  <div>
+                                    <strong style={{ fontSize: "1.05rem" }}>{st.name}</strong> · <span style={{ color: "var(--text-muted)" }}>{st.email}</span>
+                                    <div style={{ marginTop: 4 }}><span className="role-badge staff">Staff Account</span></div>
+                                  </div>
+                                  <button onClick={() => removeStaff(st._id)} className="btn-delete" style={{ padding: "5px 12px" }}>Demote Staff</button>
+                                </div>
+                                <div style={{ borderTop: "1px dashed var(--border)", paddingTop: 10 }}>
+                                  <strong style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Account Permissions:</strong>
+                                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8, marginTop: 8 }}>
+                                    {availablePermissions.map(p => {
+                                      const hasPerm = st.permissions?.includes(p.id);
+                                      return (
+                                        <label key={p.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.75rem", cursor: "pointer", color: hasPerm ? "var(--text)" : "var(--text-muted)" }}>
+                                          <input
+                                            type="checkbox"
+                                            checked={hasPerm}
+                                            onChange={() => {
+                                              const newPerms = hasPerm
+                                                ? st.permissions.filter(perm => perm !== p.id)
+                                                : [...(st.permissions || []), p.id];
+                                              updateStaffPermissions(st._id, newPerms);
+                                            }}
+                                            style={{ cursor: "pointer" }}
+                                          />
+                                          {p.label}
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 11. ADMINS TAB */}
+                {tab === "admins" && (
+                  <div className="admin-form-wide" style={{ maxWidth: 620 }}>
+                    <h2 className="admin-section-title">Admin Management access</h2>
+                    {adminMsg && <div className={`admin-msg ${adminMsg.startsWith("❌") ? "error" : ""}`}>{adminMsg}</div>}
+                    <label>Full Name *</label>
+                    <input placeholder="e.g. John Doe" value={newAdmin.name} onChange={e => setNewAdmin(a => ({ ...a, name: e.target.value }))} />
+                    <label>Email *</label>
+                    <input placeholder="admin@email.com" type="email" value={newAdmin.email} onChange={e => setNewAdmin(a => ({ ...a, email: e.target.value }))} />
+                    <label>Password *</label>
+                    <input placeholder="Strong password" type="password" value={newAdmin.password} onChange={e => setNewAdmin(a => ({ ...a, password: e.target.value }))} />
+                    <p style={{ color: "var(--text-muted)", fontSize: "0.82rem", marginBottom: 8 }}>💡 If this email already has an account, they'll be promoted to admin.</p>
+                    <button className="btn-primary" style={{ padding: "13px 32px" }} onClick={addAdmin}>Add Admin</button>
+
+                    <h2 className="admin-section-title" style={{ marginTop: 36 }}>Current Admins ({safeAdmins.length})</h2>
+                    <div className="admin-orders-list">
+                      {safeAdmins.map(a => a && (
+                        <div key={a._id || Math.random()} className="admin-order-card">
+                          <div className="order-card-left">
+                            <strong>{a.name}</strong>
+                            <span>{a.email}</span>
+                            <div style={{ marginTop: 4 }}><span className="role-badge admin">Admin Access</span></div>
+                          </div>
+                          <div className="order-card-right">
+                            {a.email !== import.meta.env.VITE_ADMIN_EMAIL && (
+                              <button onClick={() => removeAdmin(a._id)} className="btn-delete">Remove Admin</button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 12. LOGS TAB */}
+                {tab === "logs" && (
+                  <div>
+                    <h2 className="admin-section-title">System Activity Logs</h2>
+                    <div className="table-wrapper" style={{ padding: 20 }}>
+                      {safeLogs.length === 0 ? <p className="empty-state">No activities recorded yet.</p> : (
+                        <div className="recent-logs-list">
+                          {safeLogs.map(l => (
+                            <div key={l._id} className="log-item-premium">
+                              <div className="log-item-details">
+                                <strong>{l.action}</strong>
+                                <span style={{ color: "var(--text)" }}>{l.details}</span>
+                                <span className="log-item-time">User: {l.user?.name || "System"} ({l.user?.email || "internal"})</span>
+                              </div>
+                              <div style={{ textAlign: "right", fontSize: "0.72rem", color: "var(--text-muted)" }}>
+                                {l.ip && <span>IP: <code>{l.ip}</code><br /></span>}
+                                {l.createdAt && <span>{new Date(l.createdAt).toLocaleString()}</span>}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
                   </div>
-                ))}
+                )}
+
               </div>
             </div>
           )}
-
-          {/* UPI */}
-          {tab === "upi" && (
-            <div className="admin-form-wide" style={{ maxWidth: 560 }}>
-              <h2 className="admin-section-title">UPI Settings</h2>
-              {upiMsg && <div className="admin-msg">{upiMsg}</div>}
-              <label>UPI ID *</label>
-              <input placeholder="e.g. yourname@okaxis" value={upiForm.upiId} onChange={e => setUpiForm(f => ({ ...f, upiId: e.target.value }))} />
-              <label>Display Name *</label>
-              <input placeholder="e.g. VisionCart Store" value={upiForm.upiName} onChange={e => setUpiForm(f => ({ ...f, upiName: e.target.value }))} />
-              <label>Custom QR Image <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(optional — shows instantly, no delay!)</span></label>
-              <input type="file" accept="image/*" onChange={handleQrUpload} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", borderRadius: 10, padding: 10, color: "var(--text-muted)", cursor: "pointer" }} />
-              {upiForm.qrImage && (
-                <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 16 }}>
-                  <img src={upiForm.qrImage} alt="QR" style={{ width: 120, height: 120, borderRadius: 12, objectFit: "contain", border: "1px solid var(--border)", background: "white", padding: 8 }} />
-                  <button onClick={() => setUpiForm(f => ({ ...f, qrImage: "" }))} style={{ background: "none", color: "var(--pink)", border: "none", cursor: "pointer", fontSize: "0.85rem" }}>✕ Remove QR</button>
-                </div>
-              )}
-              <button className="btn-primary" style={{ padding: "13px 32px", marginTop: 16 }} onClick={saveUpi} disabled={upiLoading}>{upiLoading ? <span className="spinner" /> : "Save UPI Settings"}</button>
-            </div>
-          )}
-
-          {/* ADMINS */}
-          {tab === "admins" && (
-            <div className="admin-form-wide" style={{ maxWidth: 620 }}>
-              <h2 className="admin-section-title">Add New Admin</h2>
-              {adminMsg && <div className={`admin-msg ${adminMsg.startsWith("❌") ? "error" : ""}`}>{adminMsg}</div>}
-              {/* ✅ FIX: All 3 fields clearly visible */}
-              <label>Full Name *</label>
-              <input placeholder="e.g. John Doe" value={newAdmin.name} onChange={e => setNewAdmin(a => ({ ...a, name: e.target.value }))} />
-              <label>Email *</label>
-              <input placeholder="admin@email.com" type="email" value={newAdmin.email} onChange={e => setNewAdmin(a => ({ ...a, email: e.target.value }))} />
-              <label>Password *</label>
-              <input placeholder="Strong password" type="password" value={newAdmin.password} onChange={e => setNewAdmin(a => ({ ...a, password: e.target.value }))} />
-              <p style={{ color: "var(--text-muted)", fontSize: "0.82rem", marginBottom: 8 }}>💡 If this email already has an account, they'll be promoted to admin.</p>
-              <button className="btn-primary" style={{ padding: "13px 32px" }} onClick={addAdmin}>Add Admin</button>
-
-              <h2 className="admin-section-title" style={{ marginTop: 36 }}>Current Admins ({safeAdmins.length})</h2>
-              <div className="admin-orders-list">
-                {safeAdmins.map(a => a && (
-                  <div key={a._id || Math.random()} className="admin-order-card">
-                    <div className="order-card-left">
-                      <strong>{a.name}</strong>
-                      <span>{a.email}</span>
-                      <span style={{ fontSize: "0.75rem", color: "var(--purple2)", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}><Icon name="crown" size={12} /> Admin</span>
-                    </div>
-                    <div className="order-card-right">
-                      {a.email !== import.meta.env.VITE_ADMIN_EMAIL && (
-                        <button onClick={() => removeAdmin(a._id)} className="btn-delete">Remove</button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
         </div>
       </motion.div>
+
+      {/* Floating Vision AI Assistant chat widget */}
+      {(isAdmin || user?.role === "staff") && (
+        <>
+          <button className="vision-ai-chat-btn" onClick={() => setAiOpen(o => !o)} title="Vision AI Assistant">
+            <Icon name="sparkles" size={24} />
+          </button>
+
+          <AnimatePresence>
+            {aiOpen && (
+              <motion.div className="vision-ai-panel" initial={{ opacity: 0, scale: 0.9, y: 50 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 50 }}>
+                <div className="ai-header">
+                  <div className="ai-header-title">
+                    <div className="ai-sparkle-avatar">✦</div>
+                    <div>
+                      <h3>VISION AI</h3>
+                      <p style={{ fontSize: "0.68rem", color: "var(--cyber-blue)", fontWeight: 700 }}>Intelligent Assistant</p>
+                    </div>
+                  </div>
+                  <button className="modal-close" onClick={() => setAiOpen(false)} style={{ position: "static", background: "none" }}>
+                    <Icon name="close" size={14} />
+                  </button>
+                </div>
+                <div className="ai-chat-body">
+                  {aiMessages.map((m, idx) => (
+                    <div key={idx} className={`ai-bubble-wrap ${m.sender}`}>
+                      <div className={`ai-bubble ${m.sender}`}>
+                        {formatText(m.text)}
+                      </div>
+                    </div>
+                  ))}
+                  {aiLoading && (
+                    <div className="ai-bubble-wrap ai">
+                      <div className="ai-bubble ai">
+                        <div className="ai-typing-loader">
+                          <span />
+                          <span />
+                          <span />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={aiBottomRef} />
+                </div>
+                <div className="ai-suggestion-box">
+                  <button className="ai-suggest-btn" onClick={() => sendAiMessage("Summarize my current store performance")}>📈 Summarize Sales</button>
+                  <button className="ai-suggest-btn" onClick={() => sendAiMessage("Suggest price improvements for low stock items")}>🏷️ Pricing ideas</button>
+                  <button className="ai-suggest-btn" onClick={() => sendAiMessage("Write a template announcement banner for free shipping")}>📢 Draft banner text</button>
+                </div>
+                <div className="ai-chat-footer">
+                  <input
+                    value={aiInput}
+                    onChange={e => setAiInput(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && sendAiMessage(aiInput)}
+                    placeholder="Ask Vision AI about analytics, pricing..."
+                    disabled={aiLoading}
+                  />
+                  <button className="btn-primary" onClick={() => sendAiMessage(aiInput)} disabled={aiLoading || !aiInput.trim()} style={{ padding: "8px 16px", fontSize: "0.8rem", borderRadius: "10px" }}>
+                    Send
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </>
+      )}
+
       <AnimatePresence>{chatOrder && <OrderChat key="chat" order={chatOrder} onClose={() => setChatOrder(null)} />}</AnimatePresence>
     </>
   );
@@ -792,9 +1532,30 @@ const AdminPanel = ({ onClose }) => {
 
 // ─── SHOP PAGE ────────────────────────────────────────────
 const ShopPage = ({ onAddCart, onBuyNow, onQuickView }) => {
-  const [products, setProducts] = useState([]); const [search, setSearch] = useState(""); const [loading, setLoading] = useState(true);
-  useEffect(() => { api("/products").then(d => { setProducts(d.products || []); setLoading(false); }); }, []);
-  const filtered = products.filter(p => p.name?.toLowerCase().includes(search.toLowerCase()) || p.description?.toLowerCase().includes(search.toLowerCase()));
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [selectedCat, setSelectedCat] = useState("All");
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      api("/products"),
+      api("/categories")
+    ]).then(([pData, cData]) => {
+      setProducts(pData.products || []);
+      setCategories(cData.categories || []);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const filtered = products.filter(p => {
+    const matchesSearch = p.name?.toLowerCase().includes(search.toLowerCase()) || 
+                          p.description?.toLowerCase().includes(search.toLowerCase());
+    const matchesCategory = selectedCat === "All" || p.category === selectedCat;
+    return matchesSearch && matchesCategory;
+  });
+
   return (
     <div className="shop-page">
       <section className="hero">
@@ -817,7 +1578,22 @@ const ShopPage = ({ onAddCart, onBuyNow, onQuickView }) => {
         </motion.div>
       </div>
       <div id="products-section" className="products-section">
-        <motion.h2 className="section-title" initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }}>{search ? `Results for "${search}"` : "All Products"}</motion.h2>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, marginBottom: 20 }}>
+          <motion.h2 className="section-title" style={{ margin: 0 }} initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }}>
+            {search ? `Results for "${search}"` : selectedCat !== "All" ? `${selectedCat} Catalog` : "All Products"}
+          </motion.h2>
+          
+          {/* Category Filter pills */}
+          {!loading && categories.length > 0 && (
+            <motion.div className="category-pills" style={{ margin: 0, padding: 0 }} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+              <button className={`category-pill ${selectedCat === "All" ? "active" : ""}`} onClick={() => setSelectedCat("All")}>All</button>
+              {categories.map(c => (
+                <button key={c._id} className={`category-pill ${selectedCat === c.name ? "active" : ""}`} onClick={() => setSelectedCat(c.name)}>{c.name}</button>
+              ))}
+            </motion.div>
+          )}
+        </div>
+
         {loading ? (
           <div className="products-grid">{[...Array(6)].map((_, i) => <div key={i} className="skeleton-card"><div className="skeleton-img" /><div className="skeleton-text" /><div className="skeleton-text short" /></div>)}</div>
         ) : filtered.length === 0 ? (
@@ -1032,6 +1808,7 @@ export default function App() {
   const [toasts, setToasts] = useState([]);
   const [quickView, setQuickView] = useState(null);
   const [miniCartOpen, setMiniCartOpen] = useState(false);
+  const [announcements, setAnnouncements] = useState([]);
 
   const addToast = useCallback((message, type = "info") => {
     const id = Date.now() + Math.random();
@@ -1051,6 +1828,8 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     const t = params.get("token");
     if (t) { localStorage.setItem("vc_token", t); window.history.replaceState({}, "", "/"); api("/auth/me").then(d => { if (d.user) setUser(d.user); }); }
+    // Fetch active announcements banner ticker
+    api("/announcements").then(d => { if (d.announcements) setAnnouncements(d.announcements); });
   }, []);
 
   useEffect(() => { localStorage.setItem("vc_cart", JSON.stringify(cart)); }, [cart]);
@@ -1090,7 +1869,7 @@ export default function App() {
       <ParticleBackground />
       <AdminErrorBoundary>
         <AnimatePresence>
-          <AdminPanel key="admin" onClose={() => setShowAdmin(false)} />
+          <AdminPanel key="admin" user={user} onClose={() => setShowAdmin(false)} />
         </AnimatePresence>
       </AdminErrorBoundary>
     </div>
@@ -1102,6 +1881,14 @@ export default function App() {
   return (
     <div className="app" ref={appRef}>
       <ParticleBackground />
+      {announcements.length > 0 && (
+        <div className="announcement-banner-wrap">
+          <div className="announcement-glow" />
+          <span className="announcement-text">
+            📢 {announcements[0].title}{announcements[0].content ? ` — ${announcements[0].content}` : ""}
+          </span>
+        </div>
+      )}
       <BackToTop />
       <ToastContainer toasts={toasts} removeToast={removeToast} />
       <Navbar user={user} onLogin={() => setShowAuth(true)} onLogout={logout} onAdmin={() => setShowAdmin(true)} page={page} setPage={setPage} cartCount={cartCount} cart={cart} setCart={setCart} miniCartOpen={miniCartOpen} setMiniCartOpen={setMiniCartOpen} addToast={addToast} />
