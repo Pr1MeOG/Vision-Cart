@@ -767,6 +767,18 @@ const AdminPanel = ({ user, onClose }) => {
   const safeStaff = safeArr(staffList);
   const safeLogs = safeArr(logs);
 
+  // ✅ FIX: Fully normalize analytics before render.
+  // This prevents Admin Dashboard from crashing if backend returns partial analytics data.
+  const safeAnalytics = analytics && typeof analytics === "object" ? analytics : {};
+  const safeRevenue = safeAnalytics.revenue && typeof safeAnalytics.revenue === "object" ? safeAnalytics.revenue : {};
+  const safeAnalyticsOrders = safeAnalytics.orders && typeof safeAnalytics.orders === "object" ? safeAnalytics.orders : {};
+  const safeAnalyticsUsers = safeAnalytics.users && typeof safeAnalytics.users === "object" ? safeAnalytics.users : {};
+  const safeAnalyticsProducts = safeAnalytics.products && typeof safeAnalytics.products === "object" ? safeAnalytics.products : {};
+  const safeGraphData = safeArr(safeAnalytics.graphData);
+  const safeBestSellers = safeArr(safeAnalyticsProducts.bestSellers);
+  const safeMostViewed = safeArr(safeAnalyticsProducts.mostViewed);
+  const safeCategoryStats = safeArr(safeAnalytics.categoryStats);
+
   const filteredOrders = statusFilter === "all" ? safeOrders : safeOrders.filter(o => o && o.status === statusFilter);
   const pendingCount = safeOrders.filter(o => o && o.status === "pending").length;
   const pendingRecs = safeRecs.filter(r => r && r.status === "pending").length;
@@ -866,8 +878,8 @@ const AdminPanel = ({ user, onClose }) => {
                               <span className="metric-title">Total Sales Revenue</span>
                               <div className="metric-icon-wrap"><Icon name="bag" size={18} /></div>
                             </div>
-                            <span className="metric-value gradient-text">₹{analytics.revenue.total?.toLocaleString("en-IN")}</span>
-                            <span className="metric-change up">₹{analytics.revenue.today?.toLocaleString("en-IN")} received today</span>
+                            <span className="metric-value gradient-text">₹{(safeRevenue.total || 0).toLocaleString("en-IN")}</span>
+                            <span className="metric-change up">₹{(safeRevenue.today || 0).toLocaleString("en-IN")} received today</span>
                           </div>
 
                           <div className="metric-card">
@@ -875,8 +887,8 @@ const AdminPanel = ({ user, onClose }) => {
                               <span className="metric-title">Weekly / Monthly</span>
                               <div className="metric-icon-wrap"><Icon name="analytics" size={18} /></div>
                             </div>
-                            <span className="metric-value">₹{analytics.revenue.weekly?.toLocaleString("en-IN")}</span>
-                            <span className="metric-change neutral">₹{analytics.revenue.monthly?.toLocaleString("en-IN")} last 30 days</span>
+                            <span className="metric-value">₹{(safeRevenue.weekly || 0).toLocaleString("en-IN")}</span>
+                            <span className="metric-change neutral">₹{(safeRevenue.monthly || 0).toLocaleString("en-IN")} last 30 days</span>
                           </div>
 
                           <div className="metric-card">
@@ -884,8 +896,8 @@ const AdminPanel = ({ user, onClose }) => {
                               <span className="metric-title">Orders Activity</span>
                               <div className="metric-icon-wrap"><Icon name="package" size={18} /></div>
                             </div>
-                            <span className="metric-value">{analytics.orders.total}</span>
-                            <span className="metric-change neutral">{analytics.orders.completed} completed · {analytics.orders.pending} pending</span>
+                            <span className="metric-value">{safeAnalyticsOrders.total || 0}</span>
+                            <span className="metric-change neutral">{safeAnalyticsOrders.completed || 0} completed · {safeAnalyticsOrders.pending || 0} pending</span>
                           </div>
 
                           <div className="metric-card">
@@ -893,8 +905,8 @@ const AdminPanel = ({ user, onClose }) => {
                               <span className="metric-title">Conversion Rate</span>
                               <div className="metric-icon-wrap"><Icon name="lightning" size={18} /></div>
                             </div>
-                            <span className="metric-value">{analytics.conversionRate}%</span>
-                            <span className="metric-change up">{analytics.users.new} new users registered this week</span>
+                            <span className="metric-value">{safeAnalytics.conversionRate || 0}%</span>
+                            <span className="metric-change up">{safeAnalyticsUsers.new || 0} new users registered this week</span>
                           </div>
                         </div>
 
@@ -908,12 +920,12 @@ const AdminPanel = ({ user, onClose }) => {
                             </div>
                           </div>
                           <div className="css-bar-chart">
-                            {analytics.graphData?.map((g, idx) => {
-                              const maxRev = Math.max(...analytics.graphData.map(d => d.revenue), 1);
-                              const maxOrd = Math.max(...analytics.graphData.map(d => d.orders), 1);
-                              const revPct = (g.revenue / maxRev) * 100;
-                              const ordPct = (g.orders / maxOrd) * 100;
-                              const formattedDate = new Date(g.date).toLocaleDateString("en-IN", { month: "short", day: "numeric" });
+                            {safeGraphData.map((g, idx) => {
+                              const maxRev = Math.max(...safeGraphData.map(d => Number(d?.revenue) || 0), 1);
+                              const maxOrd = Math.max(...safeGraphData.map(d => Number(d?.orders) || 0), 1);
+                              const revPct = ((Number(g?.revenue) || 0) / maxRev) * 100;
+                              const ordPct = ((Number(g?.orders) || 0) / maxOrd) * 100;
+                              const formattedDate = g?.date ? new Date(g.date).toLocaleDateString("en-IN", { month: "short", day: "numeric" }) : "N/A";
                               return (
                                 <div key={idx} className="css-chart-bar-wrap">
                                   <div className="css-chart-bars">
@@ -922,8 +934,8 @@ const AdminPanel = ({ user, onClose }) => {
                                   </div>
                                   <span className="css-chart-label">{formattedDate}</span>
                                   <div className="css-chart-value-hint">
-                                    <strong>₹{g.revenue.toLocaleString("en-IN")}</strong><br />
-                                    <span>{g.orders} orders placed</span>
+                                    <strong>₹{(Number(g?.revenue) || 0).toLocaleString("en-IN")}</strong><br />
+                                    <span>{Number(g?.orders) || 0} orders placed</span>
                                   </div>
                                 </div>
                               );
@@ -937,7 +949,7 @@ const AdminPanel = ({ user, onClose }) => {
                           {/* Top Products */}
                           <div className="table-wrapper" style={{ padding: 20 }}>
                             <h3 style={{ marginBottom: 16, fontFamily: "Syne", fontSize: "1.1rem" }}>🏆 Top Best-Sellers</h3>
-                            {analytics.products.bestSellers?.length === 0 ? <p className="empty-state">No sales tracked yet.</p> : (
+                            {safeBestSellers.length === 0 ? <p className="empty-state">No sales tracked yet.</p> : (
                               <table className="premium-table">
                                 <thead>
                                   <tr>
@@ -947,7 +959,7 @@ const AdminPanel = ({ user, onClose }) => {
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {analytics.products.bestSellers.map(p => (
+                                  {safeBestSellers.map(p => (
                                     <tr key={p._id}>
                                       <td>{p.name}</td>
                                       <td style={{ textAlign: "right" }}>₹{p.price?.toLocaleString()}</td>
@@ -962,7 +974,7 @@ const AdminPanel = ({ user, onClose }) => {
                           {/* Low Performing Products / Views */}
                           <div className="table-wrapper" style={{ padding: 20 }}>
                             <h3 style={{ marginBottom: 16, fontFamily: "Syne", fontSize: "1.1rem" }}>🔍 Most Viewed Items</h3>
-                            {analytics.products.mostViewed?.length === 0 ? <p className="empty-state">No product views logged.</p> : (
+                            {safeMostViewed.length === 0 ? <p className="empty-state">No product views logged.</p> : (
                               <table className="premium-table">
                                 <thead>
                                   <tr>
@@ -972,7 +984,7 @@ const AdminPanel = ({ user, onClose }) => {
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {analytics.products.mostViewed.map(p => (
+                                  {safeMostViewed.map(p => (
                                     <tr key={p._id}>
                                       <td>{p.name}</td>
                                       <td style={{ textAlign: "right", color: "var(--cyber-blue)", fontWeight: 700 }}>{p.views || 0} views</td>
@@ -988,7 +1000,7 @@ const AdminPanel = ({ user, onClose }) => {
                         {/* Category Sales Breakdown */}
                         <div className="table-wrapper" style={{ padding: 20, marginTop: 10 }}>
                           <h3 style={{ marginBottom: 16, fontFamily: "Syne", fontSize: "1.1rem" }}>📁 Sales Breakdown by Category</h3>
-                          {analytics.categoryStats?.length === 0 ? <p className="empty-state">No categories configured.</p> : (
+                          {safeCategoryStats.length === 0 ? <p className="empty-state">No categories configured.</p> : (
                             <table className="premium-table">
                               <thead>
                                 <tr>
@@ -999,7 +1011,7 @@ const AdminPanel = ({ user, onClose }) => {
                                 </tr>
                               </thead>
                               <tbody>
-                                {analytics.categoryStats.map((c, idx) => (
+                                {safeCategoryStats.map((c, idx) => (
                                   <tr key={idx}>
                                     <td style={{ fontWeight: 700 }}>{c._id || "Uncategorized"}</td>
                                     <td>{c.count} products</td>
@@ -1862,7 +1874,13 @@ export default function App() {
   };
 
   const logout = async () => { localStorage.removeItem("vc_token"); try { await api("/auth/logout", { method: "POST" }); } catch {} setUser(null); addToast("Logged out", "info"); };
-  const cartCount = cart.reduce((s, i) => s + i.qty, 0);
+  const cartCount = safeArr(cart).reduce((s, i) => s + (Number(i?.qty) || 0), 0);
+
+  // ✅ FIX: Keep hooks before any conditional return.
+  // React crashes when the number/order of hooks changes between renders.
+  // Previously appRef/useRipple were below "if (showAdmin) return", so clicking Admin skipped hooks.
+  const appRef = useRef(null);
+  useRipple(appRef);
 
   if (showAdmin) return (
     <div className="app">
@@ -1874,9 +1892,6 @@ export default function App() {
       </AdminErrorBoundary>
     </div>
   );
-
-  const appRef = useRef(null);
-  useRipple(appRef);
 
   return (
     <div className="app" ref={appRef}>
