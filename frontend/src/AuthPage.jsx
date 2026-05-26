@@ -1,4 +1,4 @@
-// App.tsx
+// AuthPage.jsx - Standalone Sign In / Sign Up Page
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Chrome, Eye, EyeOff } from "lucide-react";
@@ -10,18 +10,8 @@ const DiscordIcon = () => (
   </svg>
 );
 
-// Ensure JSX intrinsic elements are recognized in environments missing
-// a global JSX.IntrinsicElements declaration (fixes TSX implicit any error)
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      [elemName: string]: any;
-    }
-  }
-}
-
 export default function AuthPage() {
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState("login");
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -81,7 +71,7 @@ export default function AuthPage() {
         localStorage.setItem("vc_token", data.token);
       }
       window.location.href = "/";
-    } catch (e: any) {
+    } catch (e) {
       setError(e?.message || "Network error");
     } finally {
       setLoading(false);
@@ -186,6 +176,7 @@ export default function AuthPage() {
               showPassword={showPassword}
               setShowPassword={setShowPassword}
               onSubmit={submit}
+              showHint={true}
             />
 
             {error && <div className="auth-error">{error}</div>}
@@ -213,7 +204,7 @@ export default function AuthPage() {
   );
 }
 
-function StepItem({ number, text, active = false }: { number: string; text: string; active?: boolean }) {
+function StepItem({ number, text, active = false }) {
   return (
     <div className={`step-item ${active ? "step-active" : ""}`}>
       <div className={`step-number ${active ? "step-number-active" : ""}`}>{number}</div>
@@ -222,7 +213,7 @@ function StepItem({ number, text, active = false }: { number: string; text: stri
   );
 }
 
-function SocialButton({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick?: () => void }) {
+function SocialButton({ icon, label, onClick }) {
   return (
     <button
       type="button"
@@ -235,13 +226,7 @@ function SocialButton({ icon, label, onClick }: { icon: React.ReactNode; label: 
   );
 }
 
-function InputGroup({ label, placeholder, type, value, onChange }: {
-  label: string;
-  placeholder: string;
-  type: string;
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-}) {
+function InputGroup({ label, placeholder, type, value, onChange }) {
   return (
     <div className="input-group">
       <label>{label}</label>
@@ -256,16 +241,7 @@ function InputGroup({ label, placeholder, type, value, onChange }: {
   );
 }
 
-function PasswordInput({ label, placeholder, value, onChange, showPassword, setShowPassword, onSubmit, showHint }: {
-  label: string;
-  placeholder: string;
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  showPassword: boolean;
-  setShowPassword: (v: boolean) => void;
-  onSubmit?: () => void;
-  showHint?: boolean;
-}): any {
+function PasswordInput({ label, placeholder, value, onChange, showPassword, setShowPassword, onSubmit, showHint }) {
   return (
     <div className="password-group">
       <label>{label}</label>
@@ -276,7 +252,7 @@ function PasswordInput({ label, placeholder, value, onChange, showPassword, setS
           value={value}
           onChange={onChange}
           className="auth-input"
-          onKeyDown={(e): false | void | undefined => e.key === "Enter" && onSubmit?.()}
+          onKeyDown={(e) => e.key === "Enter" && onSubmit?.()}
         />
         <button
           type="button"
