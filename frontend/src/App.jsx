@@ -247,8 +247,8 @@ const AuthModal = ({ onClose, onSuccess }) => {
       <motion.div className="modal auth-modal" onClick={e => e.stopPropagation()} initial={{ opacity: 0, scale: 0.85, y: 40 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.85, y: 40 }} transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}>
         <div className="modal-glow" />
         <button className="modal-close" onClick={onClose}><Icon name="close" size={14} /></button>
-        <div className="auth-logo"><img src="/banner.gif" alt="VC" style={{ height: 48, borderRadius: 10, margin: "0 auto 10px" }} /><h2>VISIONCART</h2></div>
-        <div className="auth-tabs">{["login", "register"].map(t => <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>{t === "login" ? "Login" : "Register"}</button>)}</div>
+        <div className="auth-logo"><img src="/banner.gif" alt="VC" style={{ height: 48, borderRadius: 10, margin: "0 auto 10px" }} /><h2>VisionCart Store</h2></div>
+        <div className="auth-tabs">{["login", "register"].map(t => <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>{t === "login" ? "Sign In" : "Sign Up"}</button>)}</div>
         <div className="auth-social">
           <button className="btn-google" onClick={() => window.location.href = `${API.replace("/api", "")}/api/auth/google`}>
             <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#EA4335" d="M5.26 9.77A7.24 7.24 0 0 1 12 4.75c1.73 0 3.29.6 4.52 1.6L19.86 3A11.97 11.97 0 0 0 12 0C7.61 0 3.8 2.36 1.73 5.82l3.53 3.95z"/><path fill="#34A853" d="M16.04 18.01A7.22 7.22 0 0 1 12 19.25c-2.99 0-5.56-1.82-6.74-4.48l-3.53 3.94C3.8 21.63 7.61 24 12 24c2.93 0 5.72-1.02 7.83-2.93l-3.79-3.06z"/><path fill="#FBBC05" d="M19.25 12c0-.69-.1-1.4-.26-2.07H12v4.27h4.07a3.5 3.5 0 0 1-1.53 2.3l3.79 3.06C20.53 17.52 21.5 14.97 19.25 12z" opacity=".9"/><path fill="#4285F4" d="M5.26 14.77A7.35 7.35 0 0 1 4.75 12c0-.96.18-1.89.51-2.77L1.73 5.82A11.95 11.95 0 0 0 0 12c0 1.93.46 3.76 1.26 5.37l4-3.6z"/></svg>
@@ -265,7 +265,8 @@ const AuthModal = ({ onClose, onSuccess }) => {
           <input placeholder="Email" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
           <input placeholder="Password" type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} onKeyDown={e => e.key === "Enter" && submit()} />
           {error && <p className="auth-error">{error}</p>}
-          <button className="btn-primary full" onClick={submit} disabled={loading}>{loading ? <span className="spinner" /> : tab === "login" ? "Login" : "Create Account"}</button>
+          <button className="btn-primary full" onClick={submit} disabled={loading}>{loading ? <span className="spinner" /> : tab === "login" ? "Sign In" : "Create Account"}</button>
+
         </div>
       </motion.div>
     </div>
