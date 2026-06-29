@@ -97,10 +97,10 @@ An example App Platform spec is available at `.do/app.yaml.example`.
 Set:
 
 ```env
-VITE_API_URL=https://your-digitalocean-backend.ondigitalocean.app/api
+VITE_API_URL=https://vision-cart.onrender.com/api
 ```
 
-Also set the same Vercel domain in backend `FRONTEND_URL` and `CLIENT_URL`. CORS allows only configured frontend origins.
+Also set the frontend deployment URL in backend `FRONTEND_URL` and `CLIENT_URL`. For this deployment, use `https://vision-cart-ivory.vercel.app`.
 
 ### 5. OAuth Redirect URLs
 
