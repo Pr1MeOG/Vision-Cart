@@ -33,6 +33,10 @@ Sentry.init({
 
 const app = express();
 app.disable("x-powered-by");
+const DEFAULT_FRONTEND_URL = "https://vision-cart-ivory.vercel.app";
+const DEFAULT_SERVER_URL = "https://vision-cart.onrender.com";
+const FRONTEND_ORIGIN = (process.env.FRONTEND_URL || process.env.CLIENT_URL || DEFAULT_FRONTEND_URL).replace(/\/$/, "");
+const SERVER_ORIGIN = (process.env.SERVER_URL || DEFAULT_SERVER_URL).replace(/\/$/, "");
 const REQUIRED_ENV = ["MONGO_URI", "JWT_SECRET", "SESSION_SECRET", "ADMIN_EMAIL", "ADMIN_PASSWORD"];
 const missingEnv = REQUIRED_ENV.filter((key) => !process.env[key] || !process.env[key].trim());
 if (missingEnv.length) {
@@ -103,8 +107,9 @@ app.use(helmet({
 app.use(hpp());
 app.use(mongoSanitize());
 const corsOrigins = Array.from(new Set([
-  process.env.FRONTEND_URL,
-  ...(process.env.CLIENT_URL || "http://localhost:5173").split(","),
+  FRONTEND_ORIGIN,
+  ...(process.env.CLIENT_URL || "").split(","),
+  ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
 ]))
   .map((o) => (o || "").trim())
   .filter(Boolean);
@@ -581,10 +586,10 @@ async function logActivity(userId, action, details, req) {
 passport.serializeUser((user, done) => done(null, user._id));
 passport.deserializeUser(async (id, done) => { const user = await User.findById(id); done(null, user); });
 
-if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.SERVER_URL) {
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && SERVER_ORIGIN) {
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: `${process.env.SERVER_URL}/api/auth/google/callback`,
+    callbackURL: `${SERVER_ORIGIN}/api/auth/google/callback`,
   }, async (at, rt, profile, done) => {
     let user = await User.findOne({ email: profile.emails[0].value });
     if (!user) user = await User.create({ name: profile.displayName, email: profile.emails[0].value, avatar: profile.photos[0]?.value, provider: "google", password: await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10) });
@@ -592,10 +597,10 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.
   }));
 }
 
-if (process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_SECRET && process.env.SERVER_URL) {
+if (process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_SECRET && SERVER_ORIGIN) {
   passport.use(new DiscordStrategy({
     clientID: process.env.DISCORD_CLIENT_ID, clientSecret: process.env.DISCORD_CLIENT_SECRET,
-    callbackURL: `${process.env.SERVER_URL}/api/auth/discord/callback`, scope: ["identify", "email"],
+    callbackURL: `${SERVER_ORIGIN}/api/auth/discord/callback`, scope: ["identify", "email"],
   }, async (at, rt, profile, done) => {
     let user = await User.findOne({ email: profile.email });
     if (!user) user = await User.create({ name: profile.username, email: profile.email, avatar: profile.avatar ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png` : null, provider: "discord", password: await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10) });
@@ -647,7 +652,7 @@ app.post("/api/auth/verify-admin", authMiddleware, adminMiddleware, async (req, 
 });
 
 app.get("/api/auth/google", (req, res, next) => {
-  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.SERVER_URL) {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !SERVER_ORIGIN) {
     return res.status(503).json({ message: "Google OAuth is not configured" });
   }
   const state = crypto.randomBytes(16).toString("hex");
@@ -655,35 +660,35 @@ app.get("/api/auth/google", (req, res, next) => {
   passport.authenticate("google", { scope: ["profile", "email"], state })(req, res, next);
 });
 app.get("/api/auth/google/callback", (req, res, next) => {
-  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.SERVER_URL) {
-    return res.redirect(process.env.CLIENT_URL || process.env.FRONTEND_URL || "http://localhost:5173");
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !SERVER_ORIGIN) {
+    return res.redirect(FRONTEND_ORIGIN);
   }
-  if (req.query.state !== req.session.oauthState) return res.redirect(process.env.CLIENT_URL);
-  passport.authenticate("google", { failureRedirect: process.env.CLIENT_URL }, (err, user) => {
-    if (err || !user) return res.redirect(process.env.CLIENT_URL);
+  if (req.query.state !== req.session.oauthState) return res.redirect(FRONTEND_ORIGIN);
+  passport.authenticate("google", { failureRedirect: FRONTEND_ORIGIN }, (err, user) => {
+    if (err || !user) return res.redirect(FRONTEND_ORIGIN);
     req.logIn(user, (err) => {
-      if (err) return res.redirect(process.env.CLIENT_URL);
+      if (err) return res.redirect(FRONTEND_ORIGIN);
       setTokenCookie(res, user);
-      res.redirect(process.env.CLIENT_URL);
+      res.redirect(FRONTEND_ORIGIN);
     });
   })(req, res, next);
 });
 app.get("/api/auth/discord/callback", (req, res, next) => {
-  if (!process.env.DISCORD_CLIENT_ID || !process.env.DISCORD_CLIENT_SECRET || !process.env.SERVER_URL) {
-    return res.redirect(process.env.CLIENT_URL || process.env.FRONTEND_URL || "http://localhost:5173");
+  if (!process.env.DISCORD_CLIENT_ID || !process.env.DISCORD_CLIENT_SECRET || !SERVER_ORIGIN) {
+    return res.redirect(FRONTEND_ORIGIN);
   }
-  if (req.query.state !== req.session.oauthState) return res.redirect(process.env.CLIENT_URL);
-  passport.authenticate("discord", { failureRedirect: process.env.CLIENT_URL }, (err, user) => {
-    if (err || !user) return res.redirect(process.env.CLIENT_URL);
+  if (req.query.state !== req.session.oauthState) return res.redirect(FRONTEND_ORIGIN);
+  passport.authenticate("discord", { failureRedirect: FRONTEND_ORIGIN }, (err, user) => {
+    if (err || !user) return res.redirect(FRONTEND_ORIGIN);
     req.logIn(user, (err) => {
-      if (err) return res.redirect(process.env.CLIENT_URL);
+      if (err) return res.redirect(FRONTEND_ORIGIN);
       setTokenCookie(res, user);
-      res.redirect(process.env.CLIENT_URL);
+      res.redirect(FRONTEND_ORIGIN);
     });
   })(req, res, next);
 });
 app.get("/api/auth/discord", (req, res, next) => {
-  if (!process.env.DISCORD_CLIENT_ID || !process.env.DISCORD_CLIENT_SECRET || !process.env.SERVER_URL) {
+  if (!process.env.DISCORD_CLIENT_ID || !process.env.DISCORD_CLIENT_SECRET || !SERVER_ORIGIN) {
     return res.status(503).json({ message: "Discord OAuth is not configured" });
   }
   const state = crypto.randomBytes(16).toString("hex");
