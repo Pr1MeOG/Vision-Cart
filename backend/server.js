@@ -22,6 +22,7 @@ require("dotenv").config();
 
 const app = express();
 const isProd = process.env.NODE_ENV === "production";
+app.disable("x-powered-by");
 const REQUIRED_ENV = ["MONGO_URI", "JWT_SECRET", "SESSION_SECRET", "ADMIN_EMAIL", "ADMIN_PASSWORD"];
 const missingEnv = REQUIRED_ENV.filter((key) => !process.env[key] || !process.env[key].trim());
 if (missingEnv.length) {
@@ -55,8 +56,14 @@ const storage = new CloudinaryStorage({
 const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
 
 // ─── MIDDLEWARE ───────────────────────────────────────────
-app.use(express.json({ limit: "10mb" }));
-app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: false, limit: "20kb" }));
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  referrerPolicy: { policy: "no-referrer" },
+  frameguard: { action: "deny" },
+  hsts: isProd ? { maxAge: 15552000, includeSubDomains: true, preload: true } : false,
+}));
 app.use(hpp());
 app.use(mongoSanitize());
 const corsOrigins = (process.env.CLIENT_URL || "http://localhost:5173")
@@ -74,12 +81,14 @@ app.use(cors({
 app.use(morgan(isProd ? "combined" : "dev"));
 app.use(cookieParser());
 
-const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200, message: { error: "Too many requests." } });
+const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false, message: { error: "Too many requests." } });
 app.use("/api/", limiter);
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { error: "Too many auth attempts." } });
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false, message: { error: "Too many auth attempts." } });
 app.use("/api/auth/", authLimiter);
-const orderLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30, message: { error: "Too many order requests." } });
-const receiptLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30, message: { error: "Too many receipt requests." } });
+const orderLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false, message: { error: "Too many order requests." } });
+const receiptLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 15, standardHeaders: true, legacyHeaders: false, message: { error: "Too many receipt requests." } });
+const botLimiter = rateLimit({ windowMs: 5 * 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false, message: { error: "Too many bot requests." } });
+app.use("/api/bot/", botLimiter);
 
 // ─── MONGODB ──────────────────────────────────────────────
 let server;
@@ -115,6 +124,7 @@ process.on("SIGTERM", gracefulShutdown("SIGTERM"));
 process.on("SIGINT", gracefulShutdown("SIGINT"));
 
 app.use(session({
+  name: "vc_sid",
   secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
@@ -249,6 +259,21 @@ const parsePagination = (query = {}) => {
   const limit = sanitizeLimit(query.limit);
   const skip = (page - 1) * limit;
   return { page, limit, skip };
+};
+
+const secureCompare = (a, b) => {
+  if (!a || !b) return false;
+  const left = Buffer.from(String(a));
+  const right = Buffer.from(String(b));
+  if (left.length !== right.length) return false;
+  return crypto.timingSafeEqual(left, right);
+};
+
+const botAuthMiddleware = (req, res, next) => {
+  if (!secureCompare(req.headers["x-bot-secret"], process.env.DISCORD_BOT_SECRET)) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  return next();
 };
 
 async function sendDiscordWebhook(payload) {
@@ -1214,10 +1239,8 @@ app.put("/api/receipts/:receiptId/status", authMiddleware, authorize("confirm_re
 });
 
 // Discord bot endpoint — lookup receipt by ID (bot uses this with bot secret header)
-app.get("/api/bot/receipt/:receiptId", async (req, res) => {
+app.get("/api/bot/receipt/:receiptId", botAuthMiddleware, async (req, res) => {
   try {
-    const botSecret = req.headers["x-bot-secret"];
-    if (botSecret !== process.env.DISCORD_BOT_SECRET) return res.status(401).json({ message: "Unauthorized" });
     const receipt = await Receipt.findOne({ receiptId: req.params.receiptId }).populate("user", "name email").populate("order");
     if (!receipt) return res.status(404).json({ message: "Receipt not found" });
     res.json({ receipt });
@@ -1225,10 +1248,8 @@ app.get("/api/bot/receipt/:receiptId", async (req, res) => {
 });
 
 // Discord bot endpoint — confirm/reject receipt
-app.put("/api/bot/receipt/:receiptId", async (req, res) => {
+app.put("/api/bot/receipt/:receiptId", botAuthMiddleware, async (req, res) => {
   try {
-    const botSecret = req.headers["x-bot-secret"];
-    if (botSecret !== process.env.DISCORD_BOT_SECRET) return res.status(401).json({ message: "Unauthorized" });
     const { status } = req.body;
     if (!["confirmed", "rejected"].includes(status)) return res.status(400).json({ message: "Invalid status" });
     const receipt = await Receipt.findOne({ receiptId: req.params.receiptId });
@@ -1295,7 +1316,10 @@ app.put("/api/upi", authMiddleware, adminMiddleware, async (req, res) => {
 
 // ─── HEALTH & ROOT ────────────────────────────────────────
 app.get("/", (req, res) => res.json({ status: "VisionCart API 🚀" }));
-app.get("/api/health", (req, res) => res.json({ status: "OK", timestamp: new Date().toISOString() }));
+app.get("/api/health", (req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.json({ status: "OK", timestamp: new Date().toISOString() });
+});
 app.use((req, res) => res.status(404).json({ error: "Route not found" }));
 app.use((err, req, res, next) => {
   if (err?.message === "CORS not allowed") return res.status(403).json({ error: "Origin not allowed" });
