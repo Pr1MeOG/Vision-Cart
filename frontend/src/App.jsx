@@ -2,6 +2,20 @@ import { useState, useEffect, useRef, useCallback, Component } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 const safeArr = (v) => Array.isArray(v) ? v : [];
+const DIGITAL_GOODS_CATEGORY = "All Digital Goods";
+const FEATURED_CATEGORY_NAMES = [DIGITAL_GOODS_CATEGORY, "Prompt Packs", "Goods"];
+const FEATURED_CATEGORY_PILLS = [
+  { name: DIGITAL_GOODS_CATEGORY, label: DIGITAL_GOODS_CATEGORY },
+  { name: "Prompt Packs", label: "Prompt Packs" },
+  { name: "Goods", label: "goods" },
+];
+const withDigitalGoodsCategory = (items) => {
+  const list = safeArr(items).filter(item => item && item.name);
+  const byName = new Map(list.map(item => [item.name, item]));
+  const featured = FEATURED_CATEGORY_NAMES.map(name => byName.get(name) || { _id: name.toLowerCase().replace(/[^a-z0-9]+/g, "-"), name });
+  const remaining = list.filter(item => !FEATURED_CATEGORY_NAMES.includes(item.name));
+  return [...featured, ...remaining];
+};
 const LOADING_PREVIEW_VIDEO = "/loading-preview.mp4";
 const productTrustMeta = (product) => {
   const key = String(product?._id || product?.name || "VisionCart");
@@ -19,7 +33,7 @@ class AdminErrorBoundary extends Component {
   render() {
     if (this.state.error) return (
       <div className="app" style={{ padding: 40, textAlign: "center" }}>
-        <div style={{ color: "#f87171", fontSize: "1.2rem", marginBottom: 16 }}>GÜán+Å Admin Panel crashed</div>
+        <div style={{ color: "#f87171", fontSize: "1.2rem", marginBottom: 16 }}>Gï¿½ï¿½n+ï¿½ Admin Panel crashed</div>
         <div style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginBottom: 20 }}>{this.state.error.message}</div>
         <button className="btn-primary" onClick={() => { this.setState({ error: null }); window.location.reload(); }}>Reload Page</button>
       </div>
@@ -28,7 +42,7 @@ class AdminErrorBoundary extends Component {
   }
 }
 
-// GöÇGöÇGöÇ SVG ICONS GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½ SVG ICONS Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 const Icon = ({ name, size = 20, ...props }) => {
   const icons = {
     search: <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" {...props}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
@@ -78,7 +92,7 @@ const LoadingPreviewScreen = () => (
   </motion.div>
 );
 
-// GöÇGöÇGöÇ RIPPLE HANDLER GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½ RIPPLE HANDLER Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 const useRipple = (ref) => {
   useEffect(() => {
     const el = ref.current;
@@ -103,7 +117,7 @@ const useRipple = (ref) => {
   }, [ref]);
 };
 
-// GöÇGöÇGöÇ BACK TO TOP GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½ BACK TO TOP Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 const BackToTop = () => {
   const [visible, setVisible] = useState(false);
   useEffect(() => {
@@ -161,7 +175,7 @@ const uploadFile = async (file) => {
   return res.json();
 };
 
-// GöÇGöÇGöÇ PARTICLE BG GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½ PARTICLE BG Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 const ParticleBackground = () => {
   const canvasRef = useRef(null);
   useEffect(() => {
@@ -223,7 +237,7 @@ const Typewriter = ({ texts }) => {
   return <span className="typewriter">{displayed}<span className="cursor">|</span></span>;
 };
 
-// GöÇGöÇGöÇ NAVBAR GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½ NAVBAR Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 const Navbar = ({ user, onLogin, onLogout, onAdmin, page, setPage, cartCount, cart, setCart, miniCartOpen, setMiniCartOpen, addToast }) => {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => { const f = () => setScrolled(window.scrollY > 20); window.addEventListener("scroll", f); return () => window.removeEventListener("scroll", f); }, []);
@@ -261,7 +275,7 @@ const Navbar = ({ user, onLogin, onLogout, onAdmin, page, setPage, cartCount, ca
   );
 };
 
-// GöÇGöÇGöÇ AUTH MODAL GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½ AUTH MODAL Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 const AuthModal = ({ onClose, onSuccess }) => {
   const [tab, setTab] = useState("login");
   const [form, setForm] = useState({ name: "", email: "", password: "" });
@@ -306,7 +320,7 @@ const AuthModal = ({ onClose, onSuccess }) => {
   );
 };
 
-// GöÇGöÇGöÇ PRODUCT CARD GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½ PRODUCT CARD Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 const ProductCard = ({ product, onAddCart, onBuyNow, onQuickView, index }) => {
   const isVideo = product.mediaType === "video" || product.mediaUrl?.match(/\.(mp4|webm|ogg)$/i);
   const media = product.imageUrl || product.mediaUrl;
@@ -335,10 +349,10 @@ const ProductCard = ({ product, onAddCart, onBuyNow, onQuickView, index }) => {
         <h3>{product.name}</h3>
         <p>{product.description}</p>
         <div className="product-footer">
-          <span className="product-price">Gé¦{product.price?.toLocaleString("en-IN")}</span>
+          <span className="product-price">Gï¿½{product.price?.toLocaleString("en-IN")}</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button className="btn-outline" onClick={() => onQuickView(product)} style={{ fontSize: "0.75rem", padding: "6px 12px" }}>Quick View</button>
-            <button className="btn-buynow" onClick={() => onBuyNow(product)} disabled={stock === 0} style={stock === 0 ? { opacity: 0.5, cursor: "not-allowed" } : {}}>Buy Now GåÆ</button>
+            <button className="btn-buynow" onClick={() => onBuyNow(product)} disabled={stock === 0} style={stock === 0 ? { opacity: 0.5, cursor: "not-allowed" } : {}}>Buy Now Gï¿½ï¿½</button>
           </div>
         </div>
       </div>
@@ -346,7 +360,7 @@ const ProductCard = ({ product, onAddCart, onBuyNow, onQuickView, index }) => {
   );
 };
 
-// GöÇGöÇGöÇ RECEIPT MODAL GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½ RECEIPT MODAL Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 const ReceiptModal = ({ receipt, onClose }) => {
   const statusColor = receipt.status === "confirmed" ? "#22c55e" : receipt.status === "rejected" ? "#ef4444" : "#f59e0b";
   const statusIcon = receipt.status === "confirmed" ? <Icon name="check" size={32} /> : receipt.status === "rejected" ? <Icon name="cross" size={32} /> : <span style={{ opacity: 0.5 }}>GÅ¦</span>;
@@ -367,12 +381,12 @@ const ReceiptModal = ({ receipt, onClose }) => {
           </div>
           {receipt.items?.map((item, i) => (
             <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", padding: "4px 0", borderTop: "1px solid var(--border)" }}>
-              <span>{item.name} +ù {item.qty}</span><span>Gé¦{(item.price * item.qty).toLocaleString("en-IN")}</span>
+              <span>{item.name} +ï¿½ {item.qty}</span><span>Gï¿½{(item.price * item.qty).toLocaleString("en-IN")}</span>
             </div>
           ))}
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
             <strong>Total</strong>
-            <strong className="gradient-text" style={{ fontSize: "1.1rem" }}>Gé¦{receipt.total?.toLocaleString("en-IN")}</strong>
+            <strong className="gradient-text" style={{ fontSize: "1.1rem" }}>Gï¿½{receipt.total?.toLocaleString("en-IN")}</strong>
           </div>
         </div>
         <button className="btn-primary full" onClick={onClose} style={{ marginTop: 12 }}>Close</button>
@@ -381,19 +395,19 @@ const ReceiptModal = ({ receipt, onClose }) => {
   );
 };
 
-// GöÇGöÇGöÇ UPI MODAL GÇö FIXED: No QR delay GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½ UPI MODAL Gï¿½ï¿½ FIXED: No QR delay Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 const UPIModal = ({ amount, orderId, user, onClose, onReceiptGenerated }) => {
-  // Start with env defaults GÇö show INSTANTLY, no waiting
+  // Start with env defaults Gï¿½ï¿½ show INSTANTLY, no waiting
   const [upi, setUpi] = useState({ upiId: UPI_ID, upiName: UPI_NAME, qrImage: null });
   const [step, setStep] = useState("pay");
   const [receipt, setReceipt] = useState(null);
 
   useEffect(() => {
-    // Update in background GÇö if custom QR exists it replaces auto QR silently
+    // Update in background Gï¿½ï¿½ if custom QR exists it replaces auto QR silently
     api("/upi").then(d => { if (d.upiId) setUpi(d); });
   }, []);
 
-  // Auto QR built from current upi state GÇö always ready immediately
+  // Auto QR built from current upi state Gï¿½ï¿½ always ready immediately
   const upiUrl = `upi://pay?pa=${upi.upiId}&pn=${encodeURIComponent(upi.upiName)}&am=${amount}&cu=INR&tn=${encodeURIComponent("VisionCart Order")}`;
   const autoQr = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(upiUrl)}`;
 
@@ -412,10 +426,10 @@ const UPIModal = ({ amount, orderId, user, onClose, onReceiptGenerated }) => {
         {step !== "done" && <button className="modal-close" onClick={onClose}><Icon name="close" size={14} /></button>}
         {step === "pay" && (
           <>
-            <h2>Pay via UPI =ƒÆ¦</h2>
-            <p className="upi-amount">Gé¦{amount?.toLocaleString("en-IN")}</p>
+            <h2>Pay via UPI =ï¿½Æ¦</h2>
+            <p className="upi-amount">Gï¿½{amount?.toLocaleString("en-IN")}</p>
             <div className="upi-qr">
-              {/* G£à FIX: Custom QR shows instantly if saved, else auto-QR GÇö no delay either way */}
+              {/* Gï¿½ï¿½ FIX: Custom QR shows instantly if saved, else auto-QR Gï¿½ï¿½ no delay either way */}
               <img
                 src={upi.qrImage || autoQr}
                 alt="UPI QR"
@@ -424,7 +438,7 @@ const UPIModal = ({ amount, orderId, user, onClose, onReceiptGenerated }) => {
             </div>
             <p className="upi-id">UPI ID: <strong>{upi.upiId}</strong></p>
             <p className="upi-hint">Scan with GPay -+ PhonePe -+ Paytm</p>
-            <button className="btn-primary full" onClick={markAsDone}>I've Paid GÇö Get Receipt <Icon name="receipt" size={16} /></button>
+            <button className="btn-primary full" onClick={markAsDone}>I've Paid Gï¿½ï¿½ Get Receipt <Icon name="receipt" size={16} /></button>
           </>
         )}
         {step === "generating" && (
@@ -447,7 +461,7 @@ const UPIModal = ({ amount, orderId, user, onClose, onReceiptGenerated }) => {
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
                 <span style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>Total</span>
-                <strong className="gradient-text">Gé¦{receipt.total?.toLocaleString("en-IN")}</strong>
+                <strong className="gradient-text">Gï¿½{receipt.total?.toLocaleString("en-IN")}</strong>
               </div>
             </div>
             <button className="btn-primary full" onClick={onClose}>Done</button>
@@ -458,7 +472,7 @@ const UPIModal = ({ amount, orderId, user, onClose, onReceiptGenerated }) => {
   );
 };
 
-// GöÇGöÇGöÇ ORDER CHAT GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½ ORDER CHAT Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 const OrderChat = ({ order, onClose }) => {
   const [messages, setMessages] = useState([]); const [text, setText] = useState(""); const [loading, setLoading] = useState(true); const [sending, setSending] = useState(false);
   const [chatErr, setChatErr] = useState("");
@@ -481,7 +495,7 @@ const OrderChat = ({ order, onClose }) => {
     <div className="admin-overlay" onClick={onClose}>
       <motion.div className="admin-panel chat-panel" onClick={e => e.stopPropagation()} initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}>
         <div className="admin-header">
-          <div><h2 style={{ display: "flex", alignItems: "center", gap: 8 }}><Icon name="chat" size={20} /> Chat</h2><p style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>{order?.user?.name || "Customer"} -+ {typeof order?.total === "number" ? "Gé¦" + order.total.toLocaleString("en-IN") : ""}</p></div>
+          <div><h2 style={{ display: "flex", alignItems: "center", gap: 8 }}><Icon name="chat" size={20} /> Chat</h2><p style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>{order?.user?.name || "Customer"} -+ {typeof order?.total === "number" ? "Gï¿½" + order.total.toLocaleString("en-IN") : ""}</p></div>
           <button className="modal-close" onClick={onClose}><Icon name="close" size={14} /></button>
         </div>
         <div className="chat-messages">
@@ -507,7 +521,7 @@ const OrderChat = ({ order, onClose }) => {
   );
 };
 
-// GöÇGöÇGöÇ ADMIN PANEL GÇö Full Page GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½ ADMIN PANEL Gï¿½ï¿½ Full Page Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 const AdminPanel = ({ user, onClose }) => {
   const [tab, setTab] = useState("analytics");
   const [products, setProducts] = useState([]);
@@ -522,7 +536,7 @@ const AdminPanel = ({ user, onClose }) => {
   const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
-  const [form, setForm] = useState({ name: "", description: "", price: "", stock: 10, category: "Uncategorized" });
+  const [form, setForm] = useState({ name: "", description: "", price: "", stock: 10, category: DIGITAL_GOODS_CATEGORY });
   const [mediaFile, setMediaFile] = useState(null);
   const [mediaPreview, setMediaPreview] = useState(null);
   const [mediaType, setMediaType] = useState("image");
@@ -556,7 +570,7 @@ const AdminPanel = ({ user, onClose }) => {
   // Vision AI States
   const [aiOpen, setAiOpen] = useState(false);
   const [aiMessages, setAiMessages] = useState([
-    { sender: "ai", text: "=ƒñû **Hello! I am Vision AI**, your store management assistant.\n\nI can explain analytics, recommend price optimizations, draft product copy, help write announcements, and summarize revenue trends.\n\nWhat would you like to ask?" }
+    { sender: "ai", text: "=ï¿½ï¿½ï¿½ **Hello! I am Vision AI**, your store management assistant.\n\nI can explain analytics, recommend price optimizations, draft product copy, help write announcements, and summarize revenue trends.\n\nWhat would you like to ask?" }
   ]);
   const [aiInput, setAiInput] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
@@ -659,9 +673,9 @@ const AdminPanel = ({ user, onClose }) => {
         if (up.url) { imageUrl = up.mediaType === "image" ? up.url : ""; mediaUrl = up.url; mType = up.mediaType; }
       }
       await api("/products", { method: "POST", body: JSON.stringify({ ...form, price: Number(form.price), imageUrl, mediaUrl, mediaType: mType }) });
-      setForm({ name: "", description: "", price: "", stock: 10, category: "Uncategorized" }); setMediaFile(null); setMediaPreview(null);
-      setMsg("G£à Product added!"); await fetchTab("products");
-    } catch (e) { console.error("addProduct error:", e); setMsg("G¥î Failed to add product"); }
+      setForm({ name: "", description: "", price: "", stock: 10, category: DIGITAL_GOODS_CATEGORY }); setMediaFile(null); setMediaPreview(null);
+      setMsg("Gï¿½ï¿½ Product added!"); await fetchTab("products");
+    } catch (e) { console.error("addProduct error:", e); setMsg("Gï¿½ï¿½ Failed to add product"); }
     setLoading(false);
     setTimeout(() => setMsg(""), 2500);
   };
@@ -672,12 +686,12 @@ const AdminPanel = ({ user, onClose }) => {
 
   const addAdmin = async () => {
     if (!newAdmin.name.trim() || !newAdmin.email.trim() || !newAdmin.password.trim())
-      return setAdminMsg("G¥î All fields (name, email, password) are required!");
+      return setAdminMsg("Gï¿½ï¿½ All fields (name, email, password) are required!");
     try {
       const d = await api("/admins", { method: "POST", body: JSON.stringify(newAdmin) });
-      if (d.error) return setAdminMsg("G¥î " + (d.message || "Failed to add admin"));
-      setAdminMsg("G£à Admin added successfully!"); setNewAdmin({ name: "", email: "", password: "" }); await fetchTab("admins");
-    } catch (e) { console.error("addAdmin error:", e); setAdminMsg("G¥î Failed to add admin"); }
+      if (d.error) return setAdminMsg("Gï¿½ï¿½ " + (d.message || "Failed to add admin"));
+      setAdminMsg("Gï¿½ï¿½ Admin added successfully!"); setNewAdmin({ name: "", email: "", password: "" }); await fetchTab("admins");
+    } catch (e) { console.error("addAdmin error:", e); setAdminMsg("Gï¿½ï¿½ Failed to add admin"); }
     setTimeout(() => setAdminMsg(""), 3000);
   };
 
@@ -685,24 +699,24 @@ const AdminPanel = ({ user, onClose }) => {
 
   // Category Actions
   const saveCategory = async () => {
-    if (!catForm.name.trim()) return setCatMsg("G¥î Category name is required!");
+    if (!catForm.name.trim()) return setCatMsg("Gï¿½ï¿½ Category name is required!");
     try {
       const d = await api("/categories", { method: "POST", body: JSON.stringify(catForm) });
-      if (d.error) return setCatMsg("G¥î " + (d.message || "Failed to add category"));
-      setCatMsg("G£à Category added!"); setCatForm({ name: "", description: "" }); await fetchTab("categories");
-    } catch (e) { setCatMsg("G¥î Failed to save category"); }
+      if (d.error) return setCatMsg("Gï¿½ï¿½ " + (d.message || "Failed to add category"));
+      setCatMsg("Gï¿½ï¿½ Category added!"); setCatForm({ name: "", description: "" }); await fetchTab("categories");
+    } catch (e) { setCatMsg("Gï¿½ï¿½ Failed to save category"); }
     setTimeout(() => setCatMsg(""), 3000);
   };
   const deleteCategory = async (id) => { try { await api(`/categories/${id}`, { method: "DELETE" }); await fetchTab("categories"); } catch (e) {} };
 
   // Announcement Actions
   const saveAnnouncement = async () => {
-    if (!annForm.title.trim()) return setAnnMsg("G¥î Announcement title is required!");
+    if (!annForm.title.trim()) return setAnnMsg("Gï¿½ï¿½ Announcement title is required!");
     try {
       const d = await api("/announcements", { method: "POST", body: JSON.stringify(annForm) });
-      if (d.error) return setAnnMsg("G¥î " + (d.message || "Failed to save banner"));
-      setAnnMsg("G£à Announcement created!"); setAnnForm({ title: "", content: "", isActive: true }); await fetchTab("announcements");
-    } catch (e) { setAnnMsg("G¥î Failed to save announcement"); }
+      if (d.error) return setAnnMsg("Gï¿½ï¿½ " + (d.message || "Failed to save banner"));
+      setAnnMsg("Gï¿½ï¿½ Announcement created!"); setAnnForm({ title: "", content: "", isActive: true }); await fetchTab("announcements");
+    } catch (e) { setAnnMsg("Gï¿½ï¿½ Failed to save announcement"); }
     setTimeout(() => setAnnMsg(""), 3000);
   };
   const toggleAnnouncement = async (ann) => {
@@ -715,12 +729,12 @@ const AdminPanel = ({ user, onClose }) => {
 
   // Coupon Actions
   const saveCoupon = async () => {
-    if (!couponForm.code.trim()) return setCouponMsg("G¥î Coupon code is required!");
+    if (!couponForm.code.trim()) return setCouponMsg("Gï¿½ï¿½ Coupon code is required!");
     try {
       const d = await api("/coupons", { method: "POST", body: JSON.stringify(couponForm) });
-      if (d.error) return setCouponMsg("G¥î " + (d.message || "Failed to save coupon"));
-      setCouponMsg("G£à Coupon code created!"); setCouponForm({ code: "", discountPercent: 10, isActive: true, expiresAt: "" }); await fetchTab("coupons");
-    } catch (e) { setCouponMsg("G¥î Failed to save coupon"); }
+      if (d.error) return setCouponMsg("Gï¿½ï¿½ " + (d.message || "Failed to save coupon"));
+      setCouponMsg("Gï¿½ï¿½ Coupon code created!"); setCouponForm({ code: "", discountPercent: 10, isActive: true, expiresAt: "" }); await fetchTab("coupons");
+    } catch (e) { setCouponMsg("Gï¿½ï¿½ Failed to save coupon"); }
     setTimeout(() => setCouponMsg(""), 3000);
   };
   const toggleCoupon = async (cp) => {
@@ -734,12 +748,12 @@ const AdminPanel = ({ user, onClose }) => {
   // Staff Actions
   const addStaff = async () => {
     if (!newStaff.name.trim() || !newStaff.email.trim() || !newStaff.password.trim())
-      return setStaffMsg("G¥î Name, email and password are required!");
+      return setStaffMsg("Gï¿½ï¿½ Name, email and password are required!");
     try {
       const d = await api("/staff", { method: "POST", body: JSON.stringify(newStaff) });
-      if (d.error) return setStaffMsg("G¥î " + (d.message || "Failed to create staff"));
-      setStaffMsg("G£à Staff account created!"); setNewStaff({ name: "", email: "", password: "", permissions: ["view_orders", "update_orders", "view_receipts"] }); await fetchTab("staff");
-    } catch (e) { setStaffMsg("G¥î Failed to save staff"); }
+      if (d.error) return setStaffMsg("Gï¿½ï¿½ " + (d.message || "Failed to create staff"));
+      setStaffMsg("Gï¿½ï¿½ Staff account created!"); setNewStaff({ name: "", email: "", password: "", permissions: ["view_orders", "update_orders", "view_receipts"] }); await fetchTab("staff");
+    } catch (e) { setStaffMsg("Gï¿½ï¿½ Failed to save staff"); }
     setTimeout(() => setStaffMsg(""), 3000);
   };
   const updateStaffPermissions = async (id, perms) => {
@@ -761,8 +775,8 @@ const AdminPanel = ({ user, onClose }) => {
     setUpiLoading(true);
     try {
       const d = await api("/upi", { method: "PUT", body: JSON.stringify(upiForm) });
-      setUpiMsg(d.settings ? "G£à Saved!" : "G¥î " + (d.message || "Failed"));
-    } catch (e) { console.error("saveUpi error:", e); setUpiMsg("G¥î Failed to save UPI settings"); }
+      setUpiMsg(d.settings ? "Gï¿½ï¿½ Saved!" : "Gï¿½ï¿½ " + (d.message || "Failed"));
+    } catch (e) { console.error("saveUpi error:", e); setUpiMsg("Gï¿½ï¿½ Failed to save UPI settings"); }
     setUpiLoading(false);
     setTimeout(() => setUpiMsg(""), 2500);
   };
@@ -788,10 +802,10 @@ const AdminPanel = ({ user, onClose }) => {
       if (d.reply) {
         setAiMessages(prev => [...prev, { sender: "ai", text: d.reply }]);
       } else {
-        setAiMessages(prev => [...prev, { sender: "ai", text: "GÜán+Å **Failed to connect to Vision AI.** Check connection or API keys." }]);
+        setAiMessages(prev => [...prev, { sender: "ai", text: "Gï¿½ï¿½n+ï¿½ **Failed to connect to Vision AI.** Check connection or API keys." }]);
       }
     } catch (e) {
-      setAiMessages(prev => [...prev, { sender: "ai", text: "G¥î **Error contacting Gemini backend routing.**" }]);
+      setAiMessages(prev => [...prev, { sender: "ai", text: "Gï¿½ï¿½ **Error contacting Gemini backend routing.**" }]);
     }
     setAiLoading(false);
   };
@@ -800,13 +814,13 @@ const AdminPanel = ({ user, onClose }) => {
   const safeOrders = safeArr(orders);
   const safeRecs = safeArr(receipts);
   const safeAdmins = safeArr(admins);
-  const safeCats = safeArr(categories);
+  const safeCats = withDigitalGoodsCategory(categories);
   const safeAnns = safeArr(announcements);
   const safeCoupons = safeArr(coupons);
   const safeStaff = safeArr(staffList);
   const safeLogs = safeArr(logs);
 
-  // G£à FIX: Fully normalize analytics before render.
+  // Gï¿½ï¿½ FIX: Fully normalize analytics before render.
   // This prevents Admin Dashboard from crashing if backend returns partial analytics data.
   const safeAnalytics = analytics && typeof analytics === "object" ? analytics : {};
   const safeRevenue = safeAnalytics.revenue && typeof safeAnalytics.revenue === "object" ? safeAnalytics.revenue : {};
@@ -825,7 +839,7 @@ const AdminPanel = ({ user, onClose }) => {
 
   const allTabs = [
     { id: "analytics", label: "Dashboard", icon: "analytics", permission: "view_analytics" },
-    { id: "add", label: "G£Ü Add Product", icon: "add", permission: "manage_products" },
+    { id: "add", label: "Gï¿½ï¿½ Add Product", icon: "add", permission: "manage_products" },
     { id: "products", label: "Products", icon: "shop", permission: "manage_products" },
     { id: "categories", label: "Categories", icon: "category", permission: "manage_categories" },
     { id: "orders", label: "Orders", icon: "package", permission: "view_orders" },
@@ -874,15 +888,15 @@ const AdminPanel = ({ user, onClose }) => {
             <img src="/banner.gif" alt="VC" style={{ height: 36, borderRadius: 8 }} />
             <h1><Icon name="lightning" size={22} /> {isAdmin ? "Admin Portal" : "Staff Portal"}</h1>
           </div>
-          <button className="btn-outline" onClick={onClose}>GåÉ Back to Store</button>
+          <button className="btn-outline" onClick={onClose}>Gï¿½ï¿½ Back to Store</button>
         </div>
 
         <div className="admin-fullpage-content">
-          {adminError && <div className="admin-msg error" style={{ marginBottom: 16 }}>GÜán+Å {adminError} <button onClick={() => setAdminError("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", marginLeft: 12, fontWeight: 700 }}>G£ò</button></div>}
+          {adminError && <div className="admin-msg error" style={{ marginBottom: 16 }}>Gï¿½ï¿½n+ï¿½ {adminError} <button onClick={() => setAdminError("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", marginLeft: 12, fontWeight: 700 }}>Gï¿½ï¿½</button></div>}
 
           {TABS.length === 0 ? (
             <div style={{ textAlign: "center", padding: "100px 20px" }}>
-              <h2 style={{ color: "var(--text-muted)", marginBottom: 12 }}>GÜán+Å Access Restricted</h2>
+              <h2 style={{ color: "var(--text-muted)", marginBottom: 12 }}>Gï¿½ï¿½n+ï¿½ Access Restricted</h2>
               <p style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>You do not have any permissions assigned to this staff account. Please contact an administrator to request access configurations.</p>
             </div>
           ) : (
@@ -917,8 +931,8 @@ const AdminPanel = ({ user, onClose }) => {
                               <span className="metric-title">Total Sales Revenue</span>
                               <div className="metric-icon-wrap"><Icon name="bag" size={18} /></div>
                             </div>
-                            <span className="metric-value gradient-text">Gé¦{(safeRevenue.total || 0).toLocaleString("en-IN")}</span>
-                            <span className="metric-change up">Gé¦{(safeRevenue.today || 0).toLocaleString("en-IN")} received today</span>
+                            <span className="metric-value gradient-text">Gï¿½{(safeRevenue.total || 0).toLocaleString("en-IN")}</span>
+                            <span className="metric-change up">Gï¿½{(safeRevenue.today || 0).toLocaleString("en-IN")} received today</span>
                           </div>
 
                           <div className="metric-card">
@@ -926,8 +940,8 @@ const AdminPanel = ({ user, onClose }) => {
                               <span className="metric-title">Weekly / Monthly</span>
                               <div className="metric-icon-wrap"><Icon name="analytics" size={18} /></div>
                             </div>
-                            <span className="metric-value">Gé¦{(safeRevenue.weekly || 0).toLocaleString("en-IN")}</span>
-                            <span className="metric-change neutral">Gé¦{(safeRevenue.monthly || 0).toLocaleString("en-IN")} last 30 days</span>
+                            <span className="metric-value">Gï¿½{(safeRevenue.weekly || 0).toLocaleString("en-IN")}</span>
+                            <span className="metric-change neutral">Gï¿½{(safeRevenue.monthly || 0).toLocaleString("en-IN")} last 30 days</span>
                           </div>
 
                           <div className="metric-card">
@@ -954,7 +968,7 @@ const AdminPanel = ({ user, onClose }) => {
                           <div className="chart-header">
                             <h3>Store Performance (Last 7 Days)</h3>
                             <div className="chart-legend">
-                              <div className="legend-item"><span className="legend-dot revenue" /> <span>Revenue (Gé¦)</span></div>
+                              <div className="legend-item"><span className="legend-dot revenue" /> <span>Revenue (Gï¿½)</span></div>
                               <div className="legend-item"><span className="legend-dot orders" /> <span>Orders count</span></div>
                             </div>
                           </div>
@@ -973,7 +987,7 @@ const AdminPanel = ({ user, onClose }) => {
                                   </div>
                                   <span className="css-chart-label">{formattedDate}</span>
                                   <div className="css-chart-value-hint">
-                                    <strong>Gé¦{(Number(g?.revenue) || 0).toLocaleString("en-IN")}</strong><br />
+                                    <strong>Gï¿½{(Number(g?.revenue) || 0).toLocaleString("en-IN")}</strong><br />
                                     <span>{Number(g?.orders) || 0} orders placed</span>
                                   </div>
                                 </div>
@@ -987,7 +1001,7 @@ const AdminPanel = ({ user, onClose }) => {
 
                           {/* Top Products */}
                           <div className="table-wrapper" style={{ padding: 20 }}>
-                            <h3 style={{ marginBottom: 16, fontFamily: "Syne", fontSize: "1.1rem" }}>=ƒÅå Top Best-Sellers</h3>
+                            <h3 style={{ marginBottom: 16, fontFamily: "Syne", fontSize: "1.1rem" }}>=ï¿½ï¿½ï¿½ Top Best-Sellers</h3>
                             {safeBestSellers.length === 0 ? <p className="empty-state">No sales tracked yet.</p> : (
                               <table className="premium-table">
                                 <thead>
@@ -1001,7 +1015,7 @@ const AdminPanel = ({ user, onClose }) => {
                                   {safeBestSellers.map(p => (
                                     <tr key={p._id}>
                                       <td>{p.name}</td>
-                                      <td style={{ textAlign: "right" }}>Gé¦{p.price?.toLocaleString()}</td>
+                                      <td style={{ textAlign: "right" }}>Gï¿½{p.price?.toLocaleString()}</td>
                                       <td style={{ textAlign: "right", color: "var(--pink2)", fontWeight: 700 }}>{p.salesCount || 0} items</td>
                                     </tr>
                                   ))}
@@ -1012,7 +1026,7 @@ const AdminPanel = ({ user, onClose }) => {
 
                           {/* Low Performing Products / Views */}
                           <div className="table-wrapper" style={{ padding: 20 }}>
-                            <h3 style={{ marginBottom: 16, fontFamily: "Syne", fontSize: "1.1rem" }}>=ƒöì Most Viewed Items</h3>
+                            <h3 style={{ marginBottom: 16, fontFamily: "Syne", fontSize: "1.1rem" }}>=ï¿½ï¿½ï¿½ Most Viewed Items</h3>
                             {safeMostViewed.length === 0 ? <p className="empty-state">No product views logged.</p> : (
                               <table className="premium-table">
                                 <thead>
@@ -1038,7 +1052,7 @@ const AdminPanel = ({ user, onClose }) => {
 
                         {/* Category Sales Breakdown */}
                         <div className="table-wrapper" style={{ padding: 20, marginTop: 10 }}>
-                          <h3 style={{ marginBottom: 16, fontFamily: "Syne", fontSize: "1.1rem" }}>=ƒôü Sales Breakdown by Category</h3>
+                          <h3 style={{ marginBottom: 16, fontFamily: "Syne", fontSize: "1.1rem" }}>=ï¿½ï¿½ï¿½ Sales Breakdown by Category</h3>
                           {safeCategoryStats.length === 0 ? <p className="empty-state">No categories configured.</p> : (
                             <table className="premium-table">
                               <thead>
@@ -1084,7 +1098,7 @@ const AdminPanel = ({ user, onClose }) => {
                         </div>
                         <label>Product Category</label>
                         <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} style={{ background: "rgba(255,255,255,0.05)", color: "white", padding: 12, borderRadius: 12, border: "1px solid var(--border)", outline: "none" }}>
-                          <option value="Uncategorized">Uncategorized</option>
+                          <option value={DIGITAL_GOODS_CATEGORY}>{DIGITAL_GOODS_CATEGORY}</option>
                           {safeCats.map(c => <option key={c._id} value={c.name}>{c.name}</option>)}
                         </select>
                       </div>
@@ -1098,14 +1112,14 @@ const AdminPanel = ({ user, onClose }) => {
                               : <img src={mediaPreview} style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 8, objectFit: "cover" }} alt="preview" />
                           ) : (
                             <div className="media-upload-placeholder">
-                              <span style={{ fontSize: "2.5rem" }}>=ƒôü</span>
+                              <span style={{ fontSize: "2.5rem" }}>=ï¿½ï¿½ï¿½</span>
                               <p>Select product visual file</p>
-                              <p style={{ fontSize: "0.75rem", opacity: 0.6 }}>JPG, PNG, GIF, MP4, WebM GÇö max 50MB</p>
+                              <p style={{ fontSize: "0.75rem", opacity: 0.6 }}>JPG, PNG, GIF, MP4, WebM Gï¿½ï¿½ max 50MB</p>
                             </div>
                           )}
                         </div>
                         {mediaFile && (
-                          <button onClick={() => { setMediaFile(null); setMediaPreview(null); }} style={{ marginTop: 8, background: "none", color: "var(--pink)", border: "none", cursor: "pointer", fontSize: "0.82rem" }}>G£ò Remove Media</button>
+                          <button onClick={() => { setMediaFile(null); setMediaPreview(null); }} style={{ marginTop: 8, background: "none", color: "var(--pink)", border: "none", cursor: "pointer", fontSize: "0.82rem" }}>Gï¿½ï¿½ Remove Media</button>
                         )}
                       </div>
                     </div>
@@ -1119,7 +1133,7 @@ const AdminPanel = ({ user, onClose }) => {
                 {tab === "products" && (
                   <div>
                     <h2 className="admin-section-title">Catalog Inventory ({safeProds.length} Products)</h2>
-                    {lowStockCount > 0 && <div className="admin-msg error" style={{ marginBottom: 20, textAlign: "left" }}>GÜán+Å **Low Stock Alert:** {lowStockCount} products are running low in stock. Please restock items.</div>}
+                    {lowStockCount > 0 && <div className="admin-msg error" style={{ marginBottom: 20, textAlign: "left" }}>Gï¿½ï¿½n+ï¿½ **Low Stock Alert:** {lowStockCount} products are running low in stock. Please restock items.</div>}
                     <div className="admin-products-grid">
                       {safeProds.length === 0 ? <p className="empty-state">No products found in the database.</p> : safeProds.map(p => p && (
                         <motion.div key={p._id} className="admin-product-card" layout>
@@ -1130,10 +1144,10 @@ const AdminPanel = ({ user, onClose }) => {
                             <strong style={{ display: "block", marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={p.name}>{p.name}</strong>
                             <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", display: "block", marginBottom: 6 }}>Category: {p.category || "Uncategorized"}</span>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                              <span style={{ color: "var(--pink2)", fontWeight: 700 }}>Gé¦{p.price?.toLocaleString("en-IN")}</span>
+                              <span style={{ color: "var(--pink2)", fontWeight: 700 }}>Gï¿½{p.price?.toLocaleString("en-IN")}</span>
                               <span style={{ fontSize: "0.78rem", color: p.stock <= 5 ? "#f87171" : "var(--text-muted)" }}>Stock: {p.stock}</span>
                             </div>
-                            <button className="btn-delete" onClick={() => deleteProduct(p._id)} style={{ display: "block", width: "100%", padding: 8 }}>G£ò Delete Item</button>
+                            <button className="btn-delete" onClick={() => deleteProduct(p._id)} style={{ display: "block", width: "100%", padding: 8 }}>Gï¿½ï¿½ Delete Item</button>
                           </div>
                         </motion.div>
                       ))}
@@ -1171,7 +1185,7 @@ const AdminPanel = ({ user, onClose }) => {
                                 <tr key={c._id}>
                                   <td style={{ fontWeight: 700 }}>{c.name}</td>
                                   <td><code>{c.slug}</code></td>
-                                  <td>{c.description || "GÇö"}</td>
+                                  <td>{c.description || "Gï¿½ï¿½"}</td>
                                   <td style={{ textAlign: "right" }}>
                                     <button onClick={() => deleteCategory(c._id)} className="btn-delete" style={{ padding: "4px 8px" }}>Delete</button>
                                   </td>
@@ -1205,7 +1219,7 @@ const AdminPanel = ({ user, onClose }) => {
                             <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8, borderLeft: "2px solid var(--border)", paddingLeft: 10 }}>
                               {o.items?.map((item, idx) => (
                                 <span key={idx} style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>
-                                  GÇó {item.product?.name || "Product"} +ù {item.qty} (Gé¦{item.price?.toLocaleString("en-IN")})
+                                  Gï¿½ï¿½ {item.product?.name || "Product"} +ï¿½ {item.qty} (Gï¿½{item.price?.toLocaleString("en-IN")})
                                 </span>
                               ))}
                             </div>
@@ -1216,7 +1230,7 @@ const AdminPanel = ({ user, onClose }) => {
                             </div>
                           </div>
                           <div className="order-card-right">
-                            <strong style={{ color: "var(--pink)", fontSize: "1.1rem" }}>Gé¦{o.total?.toLocaleString("en-IN")}</strong>
+                            <strong style={{ color: "var(--pink)", fontSize: "1.1rem" }}>Gï¿½{o.total?.toLocaleString("en-IN")}</strong>
                             <span className={`order-status ${o.status}`}>{o.status}</span>
                             <button onClick={() => setChatOrder(o)} className="btn-chat" style={{ marginTop: 8 }}><Icon name="chat" size={14} /> User Chat</button>
                           </div>
@@ -1234,17 +1248,17 @@ const AdminPanel = ({ user, onClose }) => {
                       {safeRecs.length === 0 ? <p className="empty-state">No payment receipts uploaded yet.</p> : safeRecs.map(r => r && (
                         <div key={r._id || Math.random()} className="admin-order-card">
                           <div className="order-card-left">
-                            <strong style={{ fontFamily: "monospace", color: "var(--purple2)" }}>{r.receiptId || "GÇö"}</strong>
-                            <span>Customer: {r.user?.name || "GÇö"} -+ {r.user?.email || "GÇö"}</span>
+                            <strong style={{ fontFamily: "monospace", color: "var(--purple2)" }}>{r.receiptId || "Gï¿½ï¿½"}</strong>
+                            <span>Customer: {r.user?.name || "Gï¿½ï¿½"} -+ {r.user?.email || "Gï¿½ï¿½"}</span>
                             {r.createdAt && <span style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: 4 }}>Date: {new Date(r.createdAt).toLocaleString("en-IN")}</span>}
                             <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 8, paddingLeft: 10, borderLeft: "2px solid rgba(236,72,153,0.3)" }}>
                               {r.items?.map((item, idx) => (
-                                <span key={idx} style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>{item.name} +ù {item.qty}</span>
+                                <span key={idx} style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>{item.name} +ï¿½ {item.qty}</span>
                               ))}
                             </div>
                           </div>
                           <div className="order-card-right">
-                            {typeof r.total === "number" && <strong style={{ color: "var(--pink)", fontSize: "1.1rem" }}>Gé¦{r.total.toLocaleString("en-IN")}</strong>}
+                            {typeof r.total === "number" && <strong style={{ color: "var(--pink)", fontSize: "1.1rem" }}>Gï¿½{r.total.toLocaleString("en-IN")}</strong>}
                             <span className={`order-status ${r.status || "pending"}`}>{r.status || "pending"}</span>
                             {r.status === "pending" && (
                               <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
@@ -1341,7 +1355,7 @@ const AdminPanel = ({ user, onClose }) => {
                               {safeAnns.map(a => (
                                 <tr key={a._id}>
                                   <td style={{ fontWeight: 700 }}>{a.title}</td>
-                                  <td>{a.content || "GÇö"}</td>
+                                  <td>{a.content || "Gï¿½ï¿½"}</td>
                                   <td>
                                     <span style={{ color: a.isActive ? "#4ade80" : "#ef4444", fontWeight: 700 }}>
                                       {a.isActive ? "Live" : "Inactive"}
@@ -1375,7 +1389,7 @@ const AdminPanel = ({ user, onClose }) => {
                     {upiForm.qrImage && (
                       <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 16 }}>
                         <img src={upiForm.qrImage} alt="QR preview" style={{ width: 120, height: 120, borderRadius: 12, objectFit: "contain", border: "1px solid var(--border)", background: "white", padding: 8 }} />
-                        <button onClick={() => setUpiForm(f => ({ ...f, qrImage: "" }))} style={{ background: "none", color: "var(--pink)", border: "none", cursor: "pointer", fontSize: "0.85rem" }}>G£ò Delete Image</button>
+                        <button onClick={() => setUpiForm(f => ({ ...f, qrImage: "" }))} style={{ background: "none", color: "var(--pink)", border: "none", cursor: "pointer", fontSize: "0.85rem" }}>Gï¿½ï¿½ Delete Image</button>
                       </div>
                     )}
                     <button className="btn-primary" style={{ padding: "13px 32px", marginTop: 16 }} onClick={saveUpi} disabled={upiLoading}>{upiLoading ? <span className="spinner" /> : "Update payment settings"}</button>
@@ -1396,7 +1410,7 @@ const AdminPanel = ({ user, onClose }) => {
                         <input placeholder="staff@visioncart.com" value={newStaff.email} onChange={e => setNewStaff({ ...newStaff, email: e.target.value })} />
                         <label>Initial Password *</label>
                         <input type="password" placeholder="Passphrase" value={newStaff.password} onChange={e => setNewStaff({ ...newStaff, password: e.target.value })} />
-                        <p style={{ color: "var(--text-muted)", fontSize: "0.78rem" }}>=ƒÆí If the user already has an account, they will be promoted and permissions updated.</p>
+                        <p style={{ color: "var(--text-muted)", fontSize: "0.78rem" }}>=ï¿½ï¿½ï¿½ If the user already has an account, they will be promoted and permissions updated.</p>
                         <button className="btn-primary" onClick={addStaff} style={{ marginTop: 8 }}>Register Staff</button>
                       </div>
                       <div>
@@ -1448,14 +1462,14 @@ const AdminPanel = ({ user, onClose }) => {
                 {tab === "admins" && (
                   <div className="admin-form-wide" style={{ maxWidth: 620 }}>
                     <h2 className="admin-section-title">Admin Management access</h2>
-                    {adminMsg && <div className={`admin-msg ${adminMsg.startsWith("G¥î") ? "error" : ""}`}>{adminMsg}</div>}
+                    {adminMsg && <div className={`admin-msg ${adminMsg.startsWith("Gï¿½ï¿½") ? "error" : ""}`}>{adminMsg}</div>}
                     <label>Full Name *</label>
                     <input placeholder="e.g. John Doe" value={newAdmin.name} onChange={e => setNewAdmin(a => ({ ...a, name: e.target.value }))} />
                     <label>Email *</label>
                     <input placeholder="admin@email.com" type="email" value={newAdmin.email} onChange={e => setNewAdmin(a => ({ ...a, email: e.target.value }))} />
                     <label>Password *</label>
                     <input placeholder="Strong password" type="password" value={newAdmin.password} onChange={e => setNewAdmin(a => ({ ...a, password: e.target.value }))} />
-                    <p style={{ color: "var(--text-muted)", fontSize: "0.82rem", marginBottom: 8 }}>=ƒÆí If this email already has an account, they'll be promoted to admin.</p>
+                    <p style={{ color: "var(--text-muted)", fontSize: "0.82rem", marginBottom: 8 }}>=ï¿½ï¿½ï¿½ If this email already has an account, they'll be promoted to admin.</p>
                     <button className="btn-primary" style={{ padding: "13px 32px" }} onClick={addAdmin}>Add Admin</button>
 
                     <h2 className="admin-section-title" style={{ marginTop: 36 }}>Current Admins ({safeAdmins.length})</h2>
@@ -1522,7 +1536,7 @@ const AdminPanel = ({ user, onClose }) => {
               <motion.div className="vision-ai-panel" initial={{ opacity: 0, scale: 0.9, y: 50 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 50 }}>
                 <div className="ai-header">
                   <div className="ai-header-title">
-                    <div className="ai-sparkle-avatar">G£ª</div>
+                    <div className="ai-sparkle-avatar">Gï¿½ï¿½</div>
                     <div>
                       <h3>VISION AI</h3>
                       <p style={{ fontSize: "0.68rem", color: "var(--cyber-blue)", fontWeight: 700 }}>Intelligent Assistant</p>
@@ -1554,9 +1568,9 @@ const AdminPanel = ({ user, onClose }) => {
                   <div ref={aiBottomRef} />
                 </div>
                 <div className="ai-suggestion-box">
-                  <button className="ai-suggest-btn" onClick={() => sendAiMessage("Summarize my current store performance")}>=ƒôê Summarize Sales</button>
-                  <button className="ai-suggest-btn" onClick={() => sendAiMessage("Suggest price improvements for low stock items")}>=ƒÅ+n+Å Pricing ideas</button>
-                  <button className="ai-suggest-btn" onClick={() => sendAiMessage("Write a template announcement banner for free shipping")}>=ƒôó Draft banner text</button>
+                  <button className="ai-suggest-btn" onClick={() => sendAiMessage("Summarize my current store performance")}>=ï¿½ï¿½ï¿½ Summarize Sales</button>
+                  <button className="ai-suggest-btn" onClick={() => sendAiMessage("Suggest price improvements for low stock items")}>=ï¿½ï¿½+n+ï¿½ Pricing ideas</button>
+                  <button className="ai-suggest-btn" onClick={() => sendAiMessage("Write a template announcement banner for free shipping")}>=ï¿½ï¿½ï¿½ Draft banner text</button>
                 </div>
                 <div className="ai-chat-footer">
                   <input
@@ -1581,7 +1595,7 @@ const AdminPanel = ({ user, onClose }) => {
   );
 };
 
-// GöÇGöÇGöÇ SHOP PAGE GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½ SHOP PAGE Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 const ShopPage = ({ onAddCart, onBuyNow, onQuickView }) => {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -1595,7 +1609,7 @@ const ShopPage = ({ onAddCart, onBuyNow, onQuickView }) => {
       api("/categories")
     ]).then(([pData, cData]) => {
       setProducts(pData.products || []);
-      setCategories(cData.categories || []);
+      setCategories(withDigitalGoodsCategory(cData.categories || []));
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
@@ -1611,13 +1625,13 @@ const ShopPage = ({ onAddCart, onBuyNow, onQuickView }) => {
     <div className="shop-page">
       <section className="hero">
         <div className="hero-content">
-          <motion.div className="hero-badge" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>G£ª Premium Store</motion.div>
+          <motion.div className="hero-badge" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>Gï¿½ï¿½ Premium Store</motion.div>
           <h1 className="hero-title"><AnimatedText text="SHOP THE" className="hero-line1" delay={0.3} /><br /><AnimatedText text="VISION" className="hero-line2 gradient-text" delay={0.5} /></h1>
           <motion.p className="hero-sub" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.9 }}>
             <Typewriter texts={["Premium products.", "Instant delivery.", "Exclusive drops.", "Only on VisionCart."]} />
           </motion.p>
           <motion.div className="hero-cta" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.1 }}>
-            <button className="btn-primary large" onClick={() => document.getElementById("products-section")?.scrollIntoView({ behavior: "smooth" })}>Explore Products Gåô</button>
+            <button className="btn-primary large" onClick={() => document.getElementById("products-section")?.scrollIntoView({ behavior: "smooth" })}>Explore Products Gï¿½ï¿½</button>
           </motion.div>
         </div>
         <div className="hero-orbs"><div className="orb orb1" /><div className="orb orb2" /><div className="orb orb3" /></div>
@@ -1632,7 +1646,7 @@ const ShopPage = ({ onAddCart, onBuyNow, onQuickView }) => {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, marginBottom: 20 }}>
           <div>
             <motion.h2 className="section-title" style={{ margin: 0 }} initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }}>
-              {search ? `Results for "${search}"` : selectedCat !== "All" ? `${selectedCat} Catalog` : "All Products"}
+              {search ? `Results for "${search}"` : selectedCat === "Goods" ? "goods Catalog" : selectedCat !== "All" ? `${selectedCat} Catalog` : "All Products"}
             </motion.h2>
             {!loading && <p className="catalog-summary">{filtered.length} of {products.length} curated VisionCart products</p>}
           </div>
@@ -1641,7 +1655,10 @@ const ShopPage = ({ onAddCart, onBuyNow, onQuickView }) => {
           {!loading && categories.length > 0 && (
             <motion.div className="category-pills" style={{ margin: 0, padding: 0 }} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
               <button className={`category-pill ${selectedCat === "All" ? "active" : ""}`} onClick={() => setSelectedCat("All")}>All</button>
-              {categories.map(c => (
+              {FEATURED_CATEGORY_PILLS.slice(1).map(({ name, label }) => (
+                <button key={name} className={`category-pill ${selectedCat === name ? "active" : ""}`} onClick={() => setSelectedCat(name)}>{label}</button>
+              ))}
+              {categories.filter(c => !FEATURED_CATEGORY_NAMES.includes(c.name)).map(c => (
                 <button key={c._id} className={`category-pill ${selectedCat === c.name ? "active" : ""}`} onClick={() => setSelectedCat(c.name)}>{c.name}</button>
               ))}
             </motion.div>
@@ -1660,14 +1677,14 @@ const ShopPage = ({ onAddCart, onBuyNow, onQuickView }) => {
   );
 };
 
-// GöÇGöÇGöÇ CART PAGE GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½ CART PAGE Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 const CartPage = ({ cart, setCart, onCheckout, setPage }) => {
   const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const update = (id, qty) => { if (qty < 1) setCart(c => c.filter(i => i._id !== id)); else setCart(c => c.map(i => i._id === id ? { ...i, qty } : i)); };
   return (
     <motion.div className="cart-page" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -30 }}>
       <h1 className="page-title">Your <span className="gradient-text">Cart</span></h1>
-      {cart.length === 0 ? <div className="empty-state"><div className="empty-state-icon"><Icon name="bag" size={48} /></div><p className="empty-state-title">Your cart is empty</p><p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>Browse products and add items you love</p><button className="btn-primary" style={{ marginTop: 12 }} onClick={() => setPage("shop")}>Start Shopping GåÆ</button></div> : (
+      {cart.length === 0 ? <div className="empty-state"><div className="empty-state-icon"><Icon name="bag" size={48} /></div><p className="empty-state-title">Your cart is empty</p><p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>Browse products and add items you love</p><button className="btn-primary" style={{ marginTop: 12 }} onClick={() => setPage("shop")}>Start Shopping Gï¿½ï¿½</button></div> : (
         <>
           <AnimatePresence>
             {cart.map(item => (
@@ -1675,20 +1692,20 @@ const CartPage = ({ cart, setCart, onCheckout, setPage }) => {
                 {item.mediaType === "video"
                   ? <video src={item.mediaUrl} style={{ width: 64, height: 64, borderRadius: 8, objectFit: "cover" }} muted />
                   : <img src={item.imageUrl || item.mediaUrl || "/placeholder.png"} alt={item.name} />}
-                <div className="cart-item-info"><h3>{item.name}</h3><span className="gradient-text">Gé¦{item.price?.toLocaleString("en-IN")}</span></div>
+                <div className="cart-item-info"><h3>{item.name}</h3><span className="gradient-text">Gï¿½{item.price?.toLocaleString("en-IN")}</span></div>
                 <div className="cart-qty">
-                  <button onClick={() => update(item._id, item.qty - 1)}>GêÆ</button>
+                  <button onClick={() => update(item._id, item.qty - 1)}>Gï¿½ï¿½</button>
                   <span>{item.qty}</span>
                   <button onClick={() => update(item._id, item.qty + 1)}>+</button>
                 </div>
-                <span className="cart-sub gradient-text">Gé¦{(item.price * item.qty).toLocaleString("en-IN")}</span>
-                <button className="btn-delete" onClick={() => update(item._id, 0)}>G£ò</button>
+                <span className="cart-sub gradient-text">Gï¿½{(item.price * item.qty).toLocaleString("en-IN")}</span>
+                <button className="btn-delete" onClick={() => update(item._id, 0)}>Gï¿½ï¿½</button>
               </motion.div>
             ))}
           </AnimatePresence>
           <motion.div className="cart-total" layout>
-            <div><p>Total Amount</p><h2 className="gradient-text">Gé¦{total.toLocaleString("en-IN")}</h2></div>
-            <button className="btn-primary large" onClick={() => onCheckout(total)}>Pay via UPI =ƒÆ¦</button>
+            <div><p>Total Amount</p><h2 className="gradient-text">Gï¿½{total.toLocaleString("en-IN")}</h2></div>
+            <button className="btn-primary large" onClick={() => onCheckout(total)}>Pay via UPI =ï¿½Æ¦</button>
           </motion.div>
         </>
       )}
@@ -1696,7 +1713,7 @@ const CartPage = ({ cart, setCart, onCheckout, setPage }) => {
   );
 };
 
-// GöÇGöÇGöÇ ORDERS PAGE GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½ ORDERS PAGE Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 const OrdersPage = ({ user }) => {
   const [orders, setOrders] = useState([]); const [loading, setLoading] = useState(true); const [viewReceipt, setViewReceipt] = useState(null); const [chatOrder, setChatOrder] = useState(null);
   useEffect(() => { api("/orders/my").then(d => { setOrders(d.orders || []); setLoading(false); }); }, []);
@@ -1711,20 +1728,20 @@ const OrdersPage = ({ user }) => {
             <motion.div key={o._id} className="cart-item" style={{ flexDirection: "column", alignItems: "flex-start", gap: 12 }} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
               <div style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center" }}>
                 <span className={`order-status ${o.status}`} style={{ textTransform: "capitalize", fontWeight: 600 }}>{o.status}</span>
-                <strong className="gradient-text" style={{ fontSize: "1.1rem" }}>Gé¦{o.total?.toLocaleString("en-IN")}</strong>
+                <strong className="gradient-text" style={{ fontSize: "1.1rem" }}>Gï¿½{o.total?.toLocaleString("en-IN")}</strong>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%" }}>
                 {o.items?.map((item, idx) => (
                   <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <img src={item.product?.imageUrl || item.product?.mediaUrl || "/placeholder.png"} alt={item.product?.name} style={{ width: 40, height: 40, borderRadius: 8, objectFit: "cover" }} />
-                    <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>{item.product?.name} +ù {item.qty}</span>
+                    <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>{item.product?.name} +ï¿½ {item.qty}</span>
                   </div>
                 ))}
               </div>
               <div style={{ display: "flex", gap: 8, width: "100%", flexWrap: "wrap" }}>
                 {o.receipt && (
                   <button onClick={() => setViewReceipt(o.receipt)} style={{ flex: 1, padding: "8px", borderRadius: 8, background: "rgba(147,51,234,0.2)", border: "1px solid var(--border)", color: "var(--text)", cursor: "pointer", fontSize: "0.82rem", fontWeight: 600 }}>
-                    <Icon name="receipt" size={14} /> {o.receipt.receiptId} GÇö <span style={{ color: o.receipt.status === "confirmed" ? "#22c55e" : o.receipt.status === "rejected" ? "#ef4444" : "#f59e0b", textTransform: "capitalize" }}>{o.receipt.status}</span>
+                    <Icon name="receipt" size={14} /> {o.receipt.receiptId} Gï¿½ï¿½ <span style={{ color: o.receipt.status === "confirmed" ? "#22c55e" : o.receipt.status === "rejected" ? "#ef4444" : "#f59e0b", textTransform: "capitalize" }}>{o.receipt.status}</span>
                   </button>
                 )}
                 <button onClick={() => setChatOrder(o)} style={{ padding: "8px 16px", borderRadius: 8, background: "rgba(236,72,153,0.15)", border: "1px solid rgba(236,72,153,0.3)", color: "var(--text)", cursor: "pointer", fontSize: "0.82rem", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Icon name="chat" size={14} /> Chat</button>
@@ -1742,7 +1759,7 @@ const OrdersPage = ({ user }) => {
   );
 };
 
-// GöÇGöÇGöÇ TOAST SYSTEM GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½ TOAST SYSTEM Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 const ToastContainer = ({ toasts, removeToast }) => {
   return (
     <div className="toast-container">
@@ -1759,7 +1776,7 @@ const ToastContainer = ({ toasts, removeToast }) => {
   );
 };
 
-// GöÇGöÇGöÇ MINI CART GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½ MINI CART Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 const MiniCart = ({ cart, setCart, setPage, onClose, addToast }) => {
   const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const update = (id, qty) => {
@@ -1789,10 +1806,10 @@ const MiniCart = ({ cart, setCart, setPage, onClose, addToast }) => {
                     : <img src={item.imageUrl || item.mediaUrl || "/placeholder.png"} alt={item.name} />}
                   <div className="mini-cart-item-info">
                     <h4>{item.name}</h4>
-                    <span>Gé¦{item.price?.toLocaleString("en-IN")}</span>
+                    <span>Gï¿½{item.price?.toLocaleString("en-IN")}</span>
                   </div>
                   <div className="mini-cart-qty">
-                    <button onClick={() => update(item._id, item.qty - 1)}>GêÆ</button>
+                    <button onClick={() => update(item._id, item.qty - 1)}>Gï¿½ï¿½</button>
                     <span>{item.qty}</span>
                     <button onClick={() => update(item._id, item.qty + 1)}>+</button>
                   </div>
@@ -1802,7 +1819,7 @@ const MiniCart = ({ cart, setCart, setPage, onClose, addToast }) => {
             <div className="mini-cart-footer">
               <div className="mini-cart-total">
                 <span>Total</span>
-                <strong className="gradient-text">Gé¦{total.toLocaleString("en-IN")}</strong>
+                <strong className="gradient-text">Gï¿½{total.toLocaleString("en-IN")}</strong>
               </div>
               <button className="btn-primary full" onClick={() => { setPage("cart"); onClose(); }}>View Cart & Checkout</button>
             </div>
@@ -1813,7 +1830,7 @@ const MiniCart = ({ cart, setCart, setPage, onClose, addToast }) => {
   );
 };
 
-// GöÇGöÇGöÇ QUICK VIEW MODAL GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½ QUICK VIEW MODAL Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 const QuickViewModal = ({ product, onClose, onAddCart, onBuyNow, addToast }) => {
   const [qty, setQty] = useState(1);
   const isVideo = product.mediaType === "video" || product.mediaUrl?.match(/\.(mp4|webm|ogg)$/i);
@@ -1830,15 +1847,15 @@ const QuickViewModal = ({ product, onClose, onAddCart, onBuyNow, addToast }) => 
         <div className="quickview-body">
           <button className="quickview-close" onClick={onClose}><Icon name="close" size={14} /></button>
           <h2>{product.name}</h2>
-          <span className="qv-price gradient-text">Gé¦{product.price?.toLocaleString("en-IN")}</span>
+          <span className="qv-price gradient-text">Gï¿½{product.price?.toLocaleString("en-IN")}</span>
           <div className={`qv-stock ${stockStatus}`}>
-            <span>{stockStatus === "in-stock" ? "G£ô" : stockStatus === "low-stock" ? "GÜá" : "G£ò"}</span>
+            <span>{stockStatus === "in-stock" ? "Gï¿½ï¿½" : stockStatus === "low-stock" ? "Gï¿½ï¿½" : "Gï¿½ï¿½"}</span>
             {stockLabel}
           </div>
           <p className="qv-desc">{product.description || "No description available."}</p>
           <div className="qv-actions">
             <div className="qv-qty">
-              <button onClick={() => setQty(q => Math.max(1, q - 1))} disabled={stock === 0}>GêÆ</button>
+              <button onClick={() => setQty(q => Math.max(1, q - 1))} disabled={stock === 0}>Gï¿½ï¿½</button>
               <span>{qty}</span>
               <button onClick={() => setQty(q => Math.min(stock, q + 1))} disabled={qty >= stock || stock === 0}>+</button>
             </div>
@@ -1852,7 +1869,7 @@ const QuickViewModal = ({ product, onClose, onAddCart, onBuyNow, addToast }) => 
   );
 };
 
-// GöÇGöÇGöÇ MAIN APP GöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇGöÇ
+// Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½ MAIN APP Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½Gï¿½ï¿½
 export default function App() {
   const [user, setUser] = useState(null); const [page, setPage] = useState("shop");
   const [showAuth, setShowAuth] = useState(false);
@@ -1924,7 +1941,7 @@ export default function App() {
   const logout = async () => { localStorage.removeItem("vc_token"); try { await api("/auth/logout", { method: "POST" }); } catch {} setUser(null); addToast("Logged out", "info"); };
   const cartCount = safeArr(cart).reduce((s, i) => s + (Number(i?.qty) || 0), 0);
 
-  // G£à FIX: Keep hooks before any conditional return.
+  // Gï¿½ï¿½ FIX: Keep hooks before any conditional return.
   // React crashes when the number/order of hooks changes between renders.
   // Previously appRef/useRipple were below "if (showAdmin) return", so clicking Admin skipped hooks.
   const appRef = useRef(null);
@@ -1948,7 +1965,7 @@ export default function App() {
         <div className="announcement-banner-wrap">
           <div className="announcement-glow" />
           <span className="announcement-text">
-            =ƒôó {announcements[0].title}{announcements[0].content ? ` GÇö ${announcements[0].content}` : ""}
+            =ï¿½ï¿½ï¿½ {announcements[0].title}{announcements[0].content ? ` Gï¿½ï¿½ ${announcements[0].content}` : ""}
           </span>
         </div>
       )}

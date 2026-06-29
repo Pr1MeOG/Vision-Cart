@@ -1,4 +1,6 @@
 const express = require("express");
+const fs = require("fs");
+const path = require("path");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -18,10 +20,18 @@ const rateLimit = require("express-rate-limit");
 const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
 const CloudinaryStorage = require("multer-storage-cloudinary");
+const Sentry = require("@sentry/node");
 require("dotenv").config();
 
-const app = express();
 const isProd = process.env.NODE_ENV === "production";
+Sentry.init({
+  dsn: process.env.SENTRY_DSN || undefined,
+  enabled: Boolean(process.env.SENTRY_DSN),
+  environment: process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || "development",
+  tracesSampleRate: isProd ? 0.15 : 1.0,
+});
+
+const app = express();
 app.disable("x-powered-by");
 const REQUIRED_ENV = ["MONGO_URI", "JWT_SECRET", "SESSION_SECRET", "ADMIN_EMAIL", "ADMIN_PASSWORD"];
 const missingEnv = REQUIRED_ENV.filter((key) => !process.env[key] || !process.env[key].trim());
@@ -36,14 +46,26 @@ if (process.env.JWT_SECRET.length < 32 || process.env.SESSION_SECRET.length < 32
 }
 
 const PORT = process.env.PORT || 5000;
+const cloudinaryEnabled = Boolean(
+  process.env.CLOUDINARY_CLOUD_NAME &&
+  process.env.CLOUDINARY_API_KEY &&
+  process.env.CLOUDINARY_API_SECRET
+);
+const ORDER_STATUSES = ["pending", "confirmed", "packed", "shipped", "delivered", "cancelled"];
+const DELIVERY_UNLOCKED_STATUSES = new Set(["confirmed", "packed", "shipped", "delivered"]);
+const DELIVERY_STORAGE_DIR = path.resolve(process.env.DELIVERY_STORAGE_DIR || path.join(__dirname, "storage", "delivery-assets"));
+const DELIVERY_MAX_FILE_SIZE_MB = Math.max(5, Number(process.env.DELIVERY_MAX_FILE_SIZE_MB) || 250);
 app.set("trust proxy", 1);
+fs.mkdirSync(DELIVERY_STORAGE_DIR, { recursive: true });
 
 // ─── CLOUDINARY CONFIG ────────────────────────────────────
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key:    process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+if (cloudinaryEnabled) {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+}
 
 const storage = new CloudinaryStorage({
   cloudinary,
@@ -53,7 +75,21 @@ const storage = new CloudinaryStorage({
     allowed_formats: ["jpg","jpeg","png","gif","webp","mp4","webm"],
   }),
 });
-const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
+const upload = cloudinaryEnabled
+  ? multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } })
+  : multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+
+const deliveryStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, DELIVERY_STORAGE_DIR),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || "").slice(0, 12);
+    cb(null, `${crypto.randomUUID()}${ext}`);
+  },
+});
+const deliveryUpload = multer({
+  storage: deliveryStorage,
+  limits: { fileSize: DELIVERY_MAX_FILE_SIZE_MB * 1024 * 1024, files: 10 },
+});
 
 // ─── MIDDLEWARE ───────────────────────────────────────────
 app.use(express.json({ limit: "1mb" }));
@@ -66,9 +102,11 @@ app.use(helmet({
 }));
 app.use(hpp());
 app.use(mongoSanitize());
-const corsOrigins = (process.env.CLIENT_URL || "http://localhost:5173")
-  .split(",")
-  .map((o) => o.trim())
+const corsOrigins = Array.from(new Set([
+  process.env.FRONTEND_URL,
+  ...(process.env.CLIENT_URL || "http://localhost:5173").split(","),
+]))
+  .map((o) => (o || "").trim())
   .filter(Boolean);
 app.use(cors({
   origin(origin, cb) {
@@ -97,6 +135,7 @@ mongoose.connect(process.env.MONGO_URI)
     console.log("✅ MongoDB Connected");
     await seedAdmin();
     await seedUpiSettings();
+    await seedCatalogCategories();
     server = app.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
   })
   .catch(err => { console.error("❌ MongoDB error:", err.message); process.exit(1); });
@@ -122,6 +161,14 @@ function gracefulShutdown(signal) {
 }
 process.on("SIGTERM", gracefulShutdown("SIGTERM"));
 process.on("SIGINT", gracefulShutdown("SIGINT"));
+process.on("unhandledRejection", (error) => {
+  Sentry.captureException(error);
+  console.error("Unhandled rejection:", error);
+});
+process.on("uncaughtException", (error) => {
+  Sentry.captureException(error);
+  console.error("Uncaught exception:", error);
+});
 
 app.use(session({
   name: "vc_sid",
@@ -151,17 +198,28 @@ const userSchema = new mongoose.Schema({
   permissions: { type: [String], default: ["view_orders", "update_orders", "view_receipts"] },
 }, { timestamps: true });
 
+const deliveryFileSchema = new mongoose.Schema({
+  originalName: { type: String, required: true },
+  storedName:   { type: String, required: true },
+  mimeType:     { type: String, default: "application/octet-stream" },
+  size:         { type: Number, default: 0 },
+}, { _id: true, timestamps: true });
+
 const productSchema = new mongoose.Schema({
-  name:        { type: String, required: true },
-  description: { type: String },
-  price:       { type: Number, required: true },
-  imageUrl:    { type: String },
-  mediaUrl:    { type: String },
-  mediaType:   { type: String, enum: ["image", "video"], default: "image" },
-  stock:       { type: Number, default: 10 },
-  category:    { type: String, default: "Uncategorized" },
-  views:       { type: Number, default: 0 },
-  salesCount:  { type: Number, default: 0 },
+  name:               { type: String, required: true },
+  description:        { type: String },
+  price:              { type: Number, required: true },
+  imageUrl:           { type: String },
+  mediaUrl:           { type: String },
+  mediaType:          { type: String, enum: ["image", "video"], default: "image" },
+  stock:              { type: Number, default: 10 },
+  category:           { type: String, default: "Uncategorized" },
+  views:              { type: Number, default: 0 },
+  salesCount:         { type: Number, default: 0 },
+  deliveryMode:       { type: String, enum: ["manual", "download", "external"], default: "manual", select: false },
+  deliveryNotes:      { type: String, select: false },
+  externalDeliveryUrl:{ type: String, select: false },
+  deliveryFiles:      { type: [deliveryFileSchema], default: [], select: false },
 }, { timestamps: true });
 
 const receiptSchema = new mongoose.Schema({
@@ -177,12 +235,18 @@ const receiptSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const orderSchema = new mongoose.Schema({
-  user:       { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  items:      [{ product: { type: mongoose.Schema.Types.ObjectId, ref: "Product" }, qty: Number, price: Number }],
-  total:      { type: Number, required: true },
-  status:     { type: String, enum: ["pending", "paid", "cancelled"], default: "pending" },
-  receipt:    { type: mongoose.Schema.Types.ObjectId, ref: "Receipt" },
-  messages:   [{ from: { type: String, enum: ["user", "admin"] }, text: String, createdAt: { type: Date, default: Date.now } }],
+  user:          { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  items:         [{ product: { type: mongoose.Schema.Types.ObjectId, ref: "Product" }, qty: Number, price: Number }],
+  total:         { type: Number, required: true },
+  status:        { type: String, enum: ORDER_STATUSES, default: "pending" },
+  receipt:       { type: mongoose.Schema.Types.ObjectId, ref: "Receipt" },
+  messages:      [{ from: { type: String, enum: ["user", "admin"] }, text: String, createdAt: { type: Date, default: Date.now } }],
+  statusHistory: [{
+    status:    { type: String, enum: ORDER_STATUSES, required: true },
+    note:      { type: String },
+    changedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    changedAt: { type: Date, default: Date.now },
+  }],
 }, { timestamps: true });
 
 const upiSettingsSchema = new mongoose.Schema({
@@ -232,6 +296,7 @@ userSchema.index({ email: 1 });
 userSchema.index({ role: 1 });
 productSchema.index({ createdAt: -1 });
 productSchema.index({ name: 1 });
+productSchema.index({ category: 1 });
 productSchema.index({ stock: 1 });
 orderSchema.index({ user: 1 });
 orderSchema.index({ status: 1 });
@@ -259,6 +324,97 @@ const parsePagination = (query = {}) => {
   const limit = sanitizeLimit(query.limit);
   const skip = (page - 1) * limit;
   return { page, limit, skip };
+};
+const sanitizeText = (value = "", max = 2000) => String(value || "").trim().slice(0, max);
+const isValidHttpUrl = (value = "") => /^https?:\/\/[^\s]+$/i.test(String(value).trim());
+const normalizeDeliveryMode = (value) => {
+  if (!value) return undefined;
+  return ["manual", "download", "external"].includes(value) ? value : undefined;
+};
+const sanitizeDeliveryPayload = (payload = {}) => {
+  const update = {};
+  const deliveryMode = normalizeDeliveryMode(payload.deliveryMode);
+  if (deliveryMode) update.deliveryMode = deliveryMode;
+  if (payload.deliveryNotes !== undefined) update.deliveryNotes = sanitizeText(payload.deliveryNotes, 4000);
+  if (payload.externalDeliveryUrl !== undefined) {
+    const trimmed = String(payload.externalDeliveryUrl || "").trim();
+    if (trimmed && !isValidHttpUrl(trimmed)) {
+      throw new Error("Invalid external delivery URL");
+    }
+    update.externalDeliveryUrl = trimmed;
+  }
+  return update;
+};
+const canAccessOrderDeliveries = (order) => DELIVERY_UNLOCKED_STATUSES.has(order?.status);
+const getDeliveryFilePath = (storedName) => path.join(DELIVERY_STORAGE_DIR, storedName);
+const removeStoredDeliveryFile = (storedName) => {
+  if (!storedName) return;
+  const filePath = getDeliveryFilePath(storedName);
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+  }
+};
+const toPlainObject = (doc) => (doc && typeof doc.toObject === "function" ? doc.toObject() : doc);
+const serializeProductForCatalog = (product) => {
+  const plain = toPlainObject(product);
+  if (!plain) return plain;
+  delete plain.deliveryFiles;
+  delete plain.deliveryMode;
+  delete plain.deliveryNotes;
+  delete plain.externalDeliveryUrl;
+  return plain;
+};
+const serializeProductForAdmin = (product) => {
+  const plain = serializeProductForCatalog(product);
+  const source = toPlainObject(product);
+  return {
+    ...plain,
+    deliveryMode: source?.deliveryMode || "manual",
+    deliveryNotes: source?.deliveryNotes || "",
+    externalDeliveryUrl: source?.externalDeliveryUrl || "",
+    deliveryFiles: Array.isArray(source?.deliveryFiles) ? source.deliveryFiles.map((file) => ({
+      _id: file._id,
+      originalName: file.originalName,
+      mimeType: file.mimeType,
+      size: file.size,
+      createdAt: file.createdAt,
+    })) : [],
+  };
+};
+const serializeOrderDeliveryPayload = (order) => {
+  const seen = new Set();
+  const items = [];
+  for (const item of order.items || []) {
+    const product = item.product;
+    if (!product || seen.has(String(product._id))) continue;
+    seen.add(String(product._id));
+    items.push({
+      productId: product._id,
+      productName: product.name,
+      deliveryMode: product.deliveryMode || "manual",
+      deliveryNotes: product.deliveryNotes || "",
+      externalDeliveryUrl: product.externalDeliveryUrl || "",
+      files: Array.isArray(product.deliveryFiles) ? product.deliveryFiles.map((file) => ({
+        fileId: file._id,
+        originalName: file.originalName,
+        mimeType: file.mimeType,
+        size: file.size,
+        downloadUrl: `/api/orders/${order._id}/delivery-files/${product._id}/${file._id}`,
+      })) : [],
+    });
+  }
+  return items;
+};
+const appendStatusHistory = (order, status, changedBy, note) => {
+  const last = Array.isArray(order.statusHistory) ? order.statusHistory[order.statusHistory.length - 1] : null;
+  if (last?.status === status) return;
+  if (!Array.isArray(order.statusHistory)) order.statusHistory = [];
+  order.statusHistory.push({
+    status,
+    note: note ? sanitizeText(note, 500) : undefined,
+    changedBy: changedBy || undefined,
+    changedAt: new Date(),
+  });
 };
 
 const secureCompare = (a, b) => {
@@ -288,10 +444,11 @@ async function sendDiscordWebhook(payload) {
   } catch (e) { console.error("Discord webhook error:", e.message); }
 }
 
-async function completeOrder(orderId) {
+async function completeOrder(orderId, changedBy = null) {
   const order = await Order.findById(orderId);
-  if (!order || order.status === "paid") return;
-  order.status = "paid";
+  if (!order || order.status === "confirmed") return;
+  order.status = "confirmed";
+  appendStatusHistory(order, "confirmed", changedBy, "Payment confirmed");
   await order.save();
 
   // Increment salesCount for each product
@@ -302,10 +459,11 @@ async function completeOrder(orderId) {
   }
 }
 
-async function cancelOrder(orderId) {
+async function cancelOrder(orderId, changedBy = null) {
   const order = await Order.findById(orderId);
   if (!order || order.status === "cancelled") return;
   order.status = "cancelled";
+  appendStatusHistory(order, "cancelled", changedBy, "Payment rejected");
   await order.save();
 
   // Restore stock!
@@ -331,6 +489,31 @@ async function seedUpiSettings() {
     await UpiSettings.create({ upiId: process.env.UPI_ID || "visioncart@upi", upiName: process.env.UPI_NAME || "VisionCart Store" });
     console.log("💳 UPI settings seeded");
   }
+}
+
+async function seedCatalogCategories() {
+  const rootCategories = [
+    {
+      name: "All Digital Goods",
+      description: "Primary catalog bucket for digital goods, including games accounts and future products.",
+      slug: "all-digital-goods"
+    },
+    {
+      name: "Goods",
+      description: "General-purpose digital goods bucket for future game accounts and related items.",
+      slug: "goods"
+    }
+  ];
+
+  for (const category of rootCategories) {
+    await Category.updateOne(
+      { slug: category.slug },
+      { $setOnInsert: category },
+      { upsert: true }
+    );
+  }
+
+  console.log("📦 Catalog categories seeded");
 }
 
 // ─── JWT ──────────────────────────────────────────────────
@@ -398,23 +581,27 @@ async function logActivity(userId, action, details, req) {
 passport.serializeUser((user, done) => done(null, user._id));
 passport.deserializeUser(async (id, done) => { const user = await User.findById(id); done(null, user); });
 
-passport.use(new GoogleStrategy({
-  clientID: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  callbackURL: `${process.env.SERVER_URL}/api/auth/google/callback`,
-}, async (at, rt, profile, done) => {
-  let user = await User.findOne({ email: profile.emails[0].value });
-  if (!user) user = await User.create({ name: profile.displayName, email: profile.emails[0].value, avatar: profile.photos[0]?.value, provider: "google", password: await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10) });
-  done(null, user);
-}));
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.SERVER_URL) {
+  passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: `${process.env.SERVER_URL}/api/auth/google/callback`,
+  }, async (at, rt, profile, done) => {
+    let user = await User.findOne({ email: profile.emails[0].value });
+    if (!user) user = await User.create({ name: profile.displayName, email: profile.emails[0].value, avatar: profile.photos[0]?.value, provider: "google", password: await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10) });
+    done(null, user);
+  }));
+}
 
-passport.use(new DiscordStrategy({
-  clientID: process.env.DISCORD_CLIENT_ID, clientSecret: process.env.DISCORD_CLIENT_SECRET,
-  callbackURL: `${process.env.SERVER_URL}/api/auth/discord/callback`, scope: ["identify", "email"],
-}, async (at, rt, profile, done) => {
-  let user = await User.findOne({ email: profile.email });
-  if (!user) user = await User.create({ name: profile.username, email: profile.email, avatar: profile.avatar ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png` : null, provider: "discord", password: await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10) });
-  done(null, user);
-}));
+if (process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_SECRET && process.env.SERVER_URL) {
+  passport.use(new DiscordStrategy({
+    clientID: process.env.DISCORD_CLIENT_ID, clientSecret: process.env.DISCORD_CLIENT_SECRET,
+    callbackURL: `${process.env.SERVER_URL}/api/auth/discord/callback`, scope: ["identify", "email"],
+  }, async (at, rt, profile, done) => {
+    let user = await User.findOne({ email: profile.email });
+    if (!user) user = await User.create({ name: profile.username, email: profile.email, avatar: profile.avatar ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png` : null, provider: "discord", password: await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10) });
+    done(null, user);
+  }));
+}
 
 // ─── AUTH ROUTES ──────────────────────────────────────────
 app.post("/api/auth/register", async (req, res) => {
@@ -460,11 +647,17 @@ app.post("/api/auth/verify-admin", authMiddleware, adminMiddleware, async (req, 
 });
 
 app.get("/api/auth/google", (req, res, next) => {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.SERVER_URL) {
+    return res.status(503).json({ message: "Google OAuth is not configured" });
+  }
   const state = crypto.randomBytes(16).toString("hex");
   req.session.oauthState = state;
   passport.authenticate("google", { scope: ["profile", "email"], state })(req, res, next);
 });
 app.get("/api/auth/google/callback", (req, res, next) => {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.SERVER_URL) {
+    return res.redirect(process.env.CLIENT_URL || process.env.FRONTEND_URL || "http://localhost:5173");
+  }
   if (req.query.state !== req.session.oauthState) return res.redirect(process.env.CLIENT_URL);
   passport.authenticate("google", { failureRedirect: process.env.CLIENT_URL }, (err, user) => {
     if (err || !user) return res.redirect(process.env.CLIENT_URL);
@@ -476,6 +669,9 @@ app.get("/api/auth/google/callback", (req, res, next) => {
   })(req, res, next);
 });
 app.get("/api/auth/discord/callback", (req, res, next) => {
+  if (!process.env.DISCORD_CLIENT_ID || !process.env.DISCORD_CLIENT_SECRET || !process.env.SERVER_URL) {
+    return res.redirect(process.env.CLIENT_URL || process.env.FRONTEND_URL || "http://localhost:5173");
+  }
   if (req.query.state !== req.session.oauthState) return res.redirect(process.env.CLIENT_URL);
   passport.authenticate("discord", { failureRedirect: process.env.CLIENT_URL }, (err, user) => {
     if (err || !user) return res.redirect(process.env.CLIENT_URL);
@@ -487,6 +683,9 @@ app.get("/api/auth/discord/callback", (req, res, next) => {
   })(req, res, next);
 });
 app.get("/api/auth/discord", (req, res, next) => {
+  if (!process.env.DISCORD_CLIENT_ID || !process.env.DISCORD_CLIENT_SECRET || !process.env.SERVER_URL) {
+    return res.status(503).json({ message: "Discord OAuth is not configured" });
+  }
   const state = crypto.randomBytes(16).toString("hex");
   req.session.oauthState = state;
   passport.authenticate("discord", { state })(req, res, next);
@@ -606,6 +805,45 @@ app.delete("/api/staff/:id", authMiddleware, adminMiddleware, async (req, res) =
     await user.save();
     await logActivity(req.user._id, "STAFF_DEMOTE", `Demoted staff member ${user.email} to user`, req);
     res.json({ message: "Staff demoted to user" });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.get("/api/users", authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { page, limit, skip } = parsePagination(req.query);
+    const search = sanitizeText(req.query.search || "", 100);
+    const filter = {};
+    if (search) {
+      filter.$or = [
+        { name: { $regex: escapeRegex(search), $options: "i" } },
+        { email: { $regex: escapeRegex(search), $options: "i" } },
+      ];
+    }
+    const [users, total] = await Promise.all([
+      User.find(filter).select("-password").sort({ createdAt: -1 }).skip(skip).limit(limit),
+      User.countDocuments(filter),
+    ]);
+    res.json({ users, page, totalPages: Math.ceil(total / limit), total });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.put("/api/users/:id", authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    if (!isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid user id" });
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    if (req.body.name !== undefined) user.name = sanitizeText(req.body.name, 120);
+    if (req.body.role !== undefined && ["user", "staff", "admin"].includes(req.body.role)) {
+      user.role = req.body.role;
+      user.isAdmin = req.body.role === "admin";
+      if (req.body.role === "user") user.permissions = [];
+    }
+    if (req.body.permissions !== undefined && Array.isArray(req.body.permissions)) {
+      user.permissions = req.body.permissions.map((permission) => sanitizeText(permission, 60)).filter(Boolean);
+    }
+    await user.save();
+    await logActivity(req.user._id, "USER_UPDATE", `Updated user ${user.email}`, req);
+    res.json({ user: await User.findById(req.params.id).select("-password") });
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
@@ -797,7 +1035,7 @@ app.get("/api/analytics/dashboard", authMiddleware, authorize("view_analytics"),
     const [totalOrders, pendingOrders, completedOrders, failedOrders] = await Promise.all([
       Order.countDocuments(),
       Order.countDocuments({ status: "pending" }),
-      Order.countDocuments({ status: "paid" }),
+      Order.countDocuments({ status: { $in: ["confirmed", "packed", "shipped", "delivered"] } }),
       Order.countDocuments({ status: "cancelled" })
     ]);
 
@@ -892,7 +1130,7 @@ app.post("/api/ai/chat", authMiddleware, authorize(), async (req, res) => {
       Product.countDocuments(),
       Order.countDocuments(),
       Order.countDocuments({ status: "pending" }),
-      Order.countDocuments({ status: "paid" }),
+      Order.countDocuments({ status: { $in: ["confirmed", "packed", "shipped", "delivered"] } }),
       Order.countDocuments({ status: "cancelled" }),
       Receipt.aggregate([{ $match: { status: "confirmed" } }, { $group: { _id: null, total: { $sum: "$total" } } }])
     ]);
@@ -960,6 +1198,9 @@ Keep your answer relatively concise but thorough.`;
 // ─── IMAGE UPLOAD ─────────────────────────────────────────
 app.post("/api/upload", authMiddleware, authorize("manage_products"), upload.single("file"), async (req, res) => {
   try {
+    if (!cloudinaryEnabled) {
+      return res.status(503).json({ message: "Cloudinary is not configured for media uploads" });
+    }
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
     res.json({
       url: req.file.path,
@@ -979,7 +1220,7 @@ app.get("/api/products", async (req, res) => {
       Product.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
       Product.countDocuments(filter),
     ]);
-    res.json({ products, page, totalPages: Math.ceil(total / limit), total });
+    res.json({ products: products.map(serializeProductForCatalog), page, totalPages: Math.ceil(total / limit), total });
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
@@ -988,7 +1229,7 @@ app.get("/api/products/:id", async (req, res) => {
     if (!isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid product id" });
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ message: "Not found" });
-    res.json({ product });
+    res.json({ product: serializeProductForCatalog(product) });
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
@@ -1000,6 +1241,7 @@ app.post("/api/products", authMiddleware, authorize("manage_products"), async (r
     const numericStock = stock === undefined ? 10 : Number(stock);
     if (!Number.isFinite(numericPrice) || numericPrice <= 0) return res.status(400).json({ message: "Invalid price" });
     if (!Number.isInteger(numericStock) || numericStock < 0) return res.status(400).json({ message: "Invalid stock" });
+    const deliveryUpdate = sanitizeDeliveryPayload(req.body);
     const product = await Product.create({
       name: name.trim(),
       description: (description || "").trim().slice(0, 2000),
@@ -1009,9 +1251,10 @@ app.post("/api/products", authMiddleware, authorize("manage_products"), async (r
       mediaType,
       stock: numericStock,
       category: category || "Uncategorized",
+      ...deliveryUpdate,
     });
     await logActivity(req.user._id, "PRODUCT_ADD", `Added product ${product.name}`, req);
-    res.status(201).json({ product });
+    res.status(201).json({ product: serializeProductForCatalog(product) });
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
@@ -1027,11 +1270,12 @@ app.put("/api/products/:id", authMiddleware, authorize("manage_products"), async
     if (update.description !== undefined) update.description = String(update.description).trim().slice(0, 2000);
     if (update.price !== undefined) { const p = Number(update.price); if (!Number.isFinite(p) || p <= 0) return res.status(400).json({ message: "Invalid price" }); update.price = p; }
     if (update.stock !== undefined) { const s = Number(update.stock); if (!Number.isInteger(s) || s < 0) return res.status(400).json({ message: "Invalid stock" }); update.stock = s; }
+    Object.assign(update, sanitizeDeliveryPayload(req.body));
     const product = await Product.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
     if (product) {
       await logActivity(req.user._id, "PRODUCT_UPDATE", `Updated product ${product.name}`, req);
     }
-    res.json({ product });
+    res.json({ product: serializeProductForCatalog(product) });
   }
   catch (e) { res.status(500).json({ message: e.message }); }
 });
@@ -1039,7 +1283,12 @@ app.put("/api/products/:id", authMiddleware, authorize("manage_products"), async
 app.delete("/api/products/:id", authMiddleware, authorize("manage_products"), async (req, res) => {
   try {
     if (!isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid product id" });
-    const product = await Product.findByIdAndDelete(req.params.id);
+    const product = await Product.findById(req.params.id).select("+deliveryFiles");
+    if (!product) return res.status(404).json({ message: "Product not found" });
+    for (const file of product.deliveryFiles || []) {
+      removeStoredDeliveryFile(file.storedName);
+    }
+    await product.deleteOne();
     if (product) {
       await logActivity(req.user._id, "PRODUCT_DELETE", `Deleted product ${product.name}`, req);
     }
@@ -1048,7 +1297,101 @@ app.delete("/api/products/:id", authMiddleware, authorize("manage_products"), as
   catch (e) { res.status(500).json({ message: e.message }); }
 });
 
+app.get("/api/admin/products/:id/delivery", authMiddleware, authorize("manage_products"), async (req, res) => {
+  try {
+    if (!isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid product id" });
+    const product = await Product.findById(req.params.id).select("+deliveryMode +deliveryNotes +externalDeliveryUrl +deliveryFiles");
+    if (!product) return res.status(404).json({ message: "Product not found" });
+    res.json({ product: serializeProductForAdmin(product) });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.post("/api/admin/products/:id/delivery-files", authMiddleware, authorize("manage_products"), deliveryUpload.array("files", 10), async (req, res) => {
+  try {
+    if (!isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid product id" });
+    const product = await Product.findById(req.params.id).select("+deliveryMode +deliveryNotes +externalDeliveryUrl +deliveryFiles");
+    if (!product) return res.status(404).json({ message: "Product not found" });
+    if (!Array.isArray(req.files) || req.files.length === 0) return res.status(400).json({ message: "No delivery files uploaded" });
+
+    const incomingFiles = req.files.map((file) => ({
+      originalName: sanitizeText(file.originalname, 255),
+      storedName: file.filename,
+      mimeType: file.mimetype || "application/octet-stream",
+      size: file.size || 0,
+    }));
+    product.deliveryFiles = [...(product.deliveryFiles || []), ...incomingFiles];
+    product.deliveryMode = "download";
+    await product.save();
+    await logActivity(req.user._id, "PRODUCT_DELIVERY_UPLOAD", `Uploaded delivery files for ${product.name}`, req);
+    res.status(201).json({ product: serializeProductForAdmin(product) });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.put("/api/admin/products/:id/delivery", authMiddleware, authorize("manage_products"), async (req, res) => {
+  try {
+    if (!isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid product id" });
+    const product = await Product.findById(req.params.id).select("+deliveryMode +deliveryNotes +externalDeliveryUrl +deliveryFiles");
+    if (!product) return res.status(404).json({ message: "Product not found" });
+    Object.assign(product, sanitizeDeliveryPayload(req.body));
+    await product.save();
+    await logActivity(req.user._id, "PRODUCT_DELIVERY_UPDATE", `Updated delivery settings for ${product.name}`, req);
+    res.json({ product: serializeProductForAdmin(product) });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.delete("/api/admin/products/:id/delivery-files/:fileId", authMiddleware, authorize("manage_products"), async (req, res) => {
+  try {
+    if (!isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid product id" });
+    const product = await Product.findById(req.params.id).select("+deliveryMode +deliveryNotes +externalDeliveryUrl +deliveryFiles");
+    if (!product) return res.status(404).json({ message: "Product not found" });
+    const file = (product.deliveryFiles || []).find((entry) => String(entry._id) === String(req.params.fileId));
+    if (!file) return res.status(404).json({ message: "Delivery file not found" });
+    product.deliveryFiles = product.deliveryFiles.filter((entry) => String(entry._id) !== String(req.params.fileId));
+    if (product.deliveryFiles.length === 0 && product.deliveryMode === "download") {
+      product.deliveryMode = "manual";
+    }
+    await product.save();
+    removeStoredDeliveryFile(file.storedName);
+    await logActivity(req.user._id, "PRODUCT_DELIVERY_DELETE", `Removed delivery file from ${product.name}`, req);
+    res.json({ product: serializeProductForAdmin(product) });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
 // ─── ORDER ROUTES ─────────────────────────────────────────
+app.post("/api/cart/quote", async (req, res) => {
+  try {
+    const { items } = req.body || {};
+    if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ message: "Cart items required" });
+    if (items.length > 50) return res.status(400).json({ message: "Too many items" });
+
+    const productIds = items.map((item) => item.product);
+    if (productIds.some((id) => !isValidObjectId(id))) return res.status(400).json({ message: "Invalid product id" });
+
+    const products = await Product.find({ _id: { $in: productIds } });
+    const productMap = new Map(products.map((product) => [String(product._id), product]));
+    const quoteItems = [];
+    let total = 0;
+
+    for (const rawItem of items) {
+      const product = productMap.get(String(rawItem.product));
+      if (!product) return res.status(400).json({ message: "Product not found" });
+      const qty = Number(rawItem.qty);
+      if (!Number.isInteger(qty) || qty < 1 || qty > 20) return res.status(400).json({ message: "Invalid quantity" });
+      quoteItems.push({
+        product: product._id,
+        name: product.name,
+        qty,
+        price: product.price,
+        stock: product.stock,
+        available: product.stock >= qty,
+      });
+      total += product.price * qty;
+    }
+
+    res.json({ items: quoteItems, total, currency: "INR" });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
 app.post("/api/orders", authMiddleware, orderLimiter, async (req, res) => {
   try {
     const { items } = req.body;
@@ -1083,7 +1426,12 @@ app.post("/api/orders", authMiddleware, orderLimiter, async (req, res) => {
       if (!updated) return res.status(400).json({ message: "Stock changed, please retry" });
     }
 
-    const order = await Order.create({ user: req.user._id, items: normalizedItems, total: computedTotal });
+    const order = await Order.create({
+      user: req.user._id,
+      items: normalizedItems,
+      total: computedTotal,
+      statusHistory: [{ status: "pending", note: "Order created", changedAt: new Date() }],
+    });
     res.status(201).json({ order });
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
@@ -1099,7 +1447,7 @@ app.get("/api/orders/all", authMiddleware, authorize("view_orders"), async (req,
   try {
     const { page, limit, skip } = parsePagination(req.query);
     const filter = {};
-    if (req.query.status && ["pending", "paid", "cancelled"].includes(req.query.status)) {
+    if (req.query.status && ORDER_STATUSES.includes(req.query.status)) {
       filter.status = req.query.status;
     }
     const [orders, total] = await Promise.all([
@@ -1113,10 +1461,72 @@ app.get("/api/orders/all", authMiddleware, authorize("view_orders"), async (req,
 app.put("/api/orders/:id/status", authMiddleware, authorize("update_orders"), async (req, res) => {
   try {
     if (!isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid order id" });
-    if (!["pending", "paid", "cancelled"].includes(req.body.status)) return res.status(400).json({ message: "Invalid status" });
-    res.json({ order: await Order.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true }) });
+    if (!ORDER_STATUSES.includes(req.body.status)) return res.status(400).json({ message: "Invalid status" });
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    order.status = req.body.status;
+    appendStatusHistory(order, req.body.status, req.user._id, req.body.note || "Order status updated");
+    await order.save();
+    res.json({ order });
   }
   catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.get("/api/orders/:id/deliveries", authMiddleware, async (req, res) => {
+  try {
+    if (!isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid order id" });
+    const order = await Order.findById(req.params.id)
+      .populate("user", "name email")
+      .populate({
+        path: "items.product",
+        select: "+deliveryMode +deliveryNotes +externalDeliveryUrl +deliveryFiles name",
+      });
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    const isOwner = String(order.user._id) === String(req.user._id);
+    const isAdmin = req.user.isAdmin || req.user.role === "admin" || req.user.role === "staff";
+    if (!isOwner && !isAdmin) return res.status(403).json({ message: "Forbidden" });
+    if (!canAccessOrderDeliveries(order)) {
+      return res.status(409).json({ message: "Delivery becomes available after payment confirmation" });
+    }
+    res.json({
+      orderId: order._id,
+      status: order.status,
+      deliveries: serializeOrderDeliveryPayload(order),
+    });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.get("/api/orders/:id/delivery-files/:productId/:fileId", authMiddleware, async (req, res) => {
+  try {
+    if (!isValidObjectId(req.params.id) || !isValidObjectId(req.params.productId) || !isValidObjectId(req.params.fileId)) {
+      return res.status(400).json({ message: "Invalid identifier" });
+    }
+    const order = await Order.findById(req.params.id)
+      .populate("user", "name email")
+      .populate({
+        path: "items.product",
+        select: "+deliveryMode +deliveryNotes +externalDeliveryUrl +deliveryFiles name",
+      });
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    const isOwner = String(order.user._id) === String(req.user._id);
+    const isAdmin = req.user.isAdmin || req.user.role === "admin" || req.user.role === "staff";
+    if (!isOwner && !isAdmin) return res.status(403).json({ message: "Forbidden" });
+    if (!canAccessOrderDeliveries(order)) {
+      return res.status(409).json({ message: "Delivery becomes available after payment confirmation" });
+    }
+
+    const product = (order.items || [])
+      .map((item) => item.product)
+      .find((entry) => entry && String(entry._id) === String(req.params.productId));
+    if (!product) return res.status(404).json({ message: "Product delivery not found" });
+
+    const file = (product.deliveryFiles || []).find((entry) => String(entry._id) === String(req.params.fileId));
+    if (!file) return res.status(404).json({ message: "Delivery file not found" });
+
+    const filePath = getDeliveryFilePath(file.storedName);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ message: "Stored file missing" });
+    res.download(filePath, file.originalName);
+  } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
 // ─── RECEIPT ROUTES ───────────────────────────────────────
@@ -1217,9 +1627,9 @@ app.put("/api/receipts/:receiptId/status", authMiddleware, authorize("confirm_re
 
     // Update order status too (via helpers to adjust salesCount and stock)
     if (status === "confirmed") {
-      await completeOrder(receipt.order);
+      await completeOrder(receipt.order, req.user._id);
     } else if (status === "rejected") {
-      await cancelOrder(receipt.order);
+      await cancelOrder(receipt.order, req.user._id);
     }
 
     // Notify Discord
@@ -1316,13 +1726,29 @@ app.put("/api/upi", authMiddleware, adminMiddleware, async (req, res) => {
 
 // ─── HEALTH & ROOT ────────────────────────────────────────
 app.get("/", (req, res) => res.json({ status: "VisionCart API 🚀" }));
+app.get("/health", (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.json({
+    status: "OK",
+    service: "visioncart-backend",
+    database: mongoose.connection.readyState === 1 ? "connected" : "connecting",
+    timestamp: new Date().toISOString(),
+  });
+});
 app.get("/api/health", (req, res) => {
   res.set("Cache-Control", "no-store");
-  res.json({ status: "OK", timestamp: new Date().toISOString() });
+  res.json({
+    status: "OK",
+    service: "visioncart-backend",
+    database: mongoose.connection.readyState === 1 ? "connected" : "connecting",
+    timestamp: new Date().toISOString(),
+  });
 });
+Sentry.setupExpressErrorHandler(app);
 app.use((req, res) => res.status(404).json({ error: "Route not found" }));
 app.use((err, req, res, next) => {
   if (err?.message === "CORS not allowed") return res.status(403).json({ error: "Origin not allowed" });
+  Sentry.captureException(err);
   console.error("❌", err.stack);
   res.status(500).json({ error: isProd ? "Internal server error" : err.message });
 });

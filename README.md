@@ -119,21 +119,25 @@ https://your-digitalocean-backend.ondigitalocean.app/api/auth/discord/callback
 VisionCart/
 ├── frontend/              # React + Vite SPA
 │   ├── src/
-│   │   ├── App.jsx        # All components (~1100 lines)
+│   │   ├── App.jsx        # Main storefront and admin UI
 │   │   ├── main.jsx       # Entry point
-│   │   └── index.css      # All styles (~860 lines)
+│   │   └── index.css      # Global styles
 │   ├── public/
-│   │   ├── banner.gif     # Animated logo (replace with your own)
+│   │   ├── banner.gif     # Animated logo
 │   │   └── placeholder.png
 │   ├── index.html
 │   ├── vite.config.js
 │   ├── package.json
+│   ├── package-lock.json
 │   ├── .env.example
 │   └── .gitignore
 │
 ├── backend/               # Express + MongoDB REST API
-│   ├── server.js          # Single-file API (~780 lines)
+│   ├── src/
+│   │   └── server.js      # Backend entrypoint
+│   ├── server.js          # Existing API implementation
 │   ├── package.json
+│   ├── package-lock.json
 │   ├── .env.example
 │   └── .gitignore
 │
@@ -180,6 +184,12 @@ npm start
 ```
 
 Open http://localhost:5173
+
+### Security Notes
+- Keep `.env` files out of git.
+- Use `.env.example` as the only committed environment template.
+- Never commit real MongoDB URLs, JWT secrets, payment keys, webhook URLs, or admin passwords.
+- Rotate any secret that has ever been shared outside your trusted environment.
 
 ---
 

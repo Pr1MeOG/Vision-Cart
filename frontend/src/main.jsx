@@ -1,5 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import '../sentry.client.js'
 import AuthPage from './AuthPage.jsx'
 import './index.css'
 

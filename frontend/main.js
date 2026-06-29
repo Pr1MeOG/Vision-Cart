@@ -1,7 +1,9 @@
+import "./sentry.client.js";
+
 (function () {
   "use strict";
 
-  const API = window.VISISON_CART_API_URL || "http://localhost:5000/api";
+  const API = import.meta.env.VITE_API_URL || window.VISIONCART_API_URL || window.VISISON_CART_API_URL || "http://localhost:5000/api";
   const API_BASE = API.replace(/\/api\/?$/, "");
   const STORE_NAME = "Visison Cart";
   const CART_KEY = "vc_cart";
@@ -336,7 +338,7 @@
     const { rating, reviews } = productRating(product);
     const media = isVideo(product)
       ? `<video src="${escapeAttr(getMedia(product))}" muted loop playsinline></video>`
-      : `<img src="${escapeAttr(getMedia(product))}" alt="${escapeAttr(product.name)}">`;
+      : `<img src="${escapeAttr(getMedia(product))}" alt="${escapeAttr(product.name)}" loading="lazy" decoding="async">`;
 
     return `
       <article class="product-card" data-product-id="${escapeAttr(product._id)}">
@@ -373,7 +375,7 @@
     els.arrivalsWrapper.innerHTML = arrivals.map((product) => `
       <article class="new-card swiper-slide" data-product-id="${escapeAttr(product._id)}">
         <div class="product-media">
-          <img src="${escapeAttr(getMedia(product))}" alt="${escapeAttr(product.name)}">
+          <img src="${escapeAttr(getMedia(product))}" alt="${escapeAttr(product.name)}" loading="lazy" decoding="async">
           <span class="badge">New</span>
         </div>
         <span class="product-category">${escapeHtml(product.category || "Featured")}</span>
@@ -440,7 +442,7 @@
     els.cartItems.innerHTML = state.cart.map((item) => {
       const media = isVideo(item)
         ? `<video src="${escapeAttr(getMedia(item))}" muted></video>`
-        : `<img src="${escapeAttr(getMedia(item))}" alt="${escapeAttr(item.name)}">`;
+        : `<img src="${escapeAttr(getMedia(item))}" alt="${escapeAttr(item.name)}" loading="lazy" decoding="async">`;
       return `
         <article class="cart-card" data-product-id="${escapeAttr(item._id)}">
           ${media}
@@ -466,7 +468,7 @@
     if (!product) return;
     const media = isVideo(product)
       ? `<video src="${escapeAttr(getMedia(product))}" autoplay muted loop playsinline></video>`
-      : `<img src="${escapeAttr(getMedia(product))}" alt="${escapeAttr(product.name)}">`;
+      : `<img src="${escapeAttr(getMedia(product))}" alt="${escapeAttr(product.name)}" loading="eager" decoding="async">`;
 
     els.quickView.innerHTML = `
       <article class="modal-card quick-view-content">
