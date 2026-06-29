@@ -4,6 +4,115 @@ Full-stack e-commerce store with UPI payments, Google/Discord OAuth, admin panel
 
 ---
 
+## Recommended Production Architecture
+
+- **Frontend:** Vercel
+- **Backend/API:** DigitalOcean App Platform (`backend`, `npm start`)
+- **Database:** DigitalOcean Managed PostgreSQL
+- **Product images/videos:** DigitalOcean Spaces with CDN
+- **Monitoring:** DigitalOcean Uptime checks against `/health`
+
+This keeps VisionCart production-ready without Kubernetes, large droplets, load balancers, or unnecessary infrastructure spend.
+
+---
+
+## DigitalOcean App Platform Deployment
+
+### 1. Managed PostgreSQL
+
+1. Create a DigitalOcean Managed PostgreSQL cluster.
+2. Copy the connection string.
+3. Set it in App Platform as:
+
+```env
+DATABASE_URL=postgresql://USER:PASSWORD@HOST:25060/visioncart?sslmode=require
+```
+
+DigitalOcean managed database backups work at the database layer, so the backend stores orders/products/users in PostgreSQL tables instead of project files.
+
+### 2. DigitalOcean Spaces
+
+1. Create a Space.
+2. Create Spaces access keys.
+3. Set these backend env vars:
+
+```env
+DO_SPACES_KEY=
+DO_SPACES_SECRET=
+DO_SPACES_ENDPOINT=https://nyc3.digitaloceanspaces.com
+DO_SPACES_BUCKET=
+DO_SPACES_REGION=nyc3
+```
+
+Uploaded product media is stored in Spaces through the S3-compatible API, not inside the repo or App Platform container.
+
+### 3. Backend App Platform Service
+
+Use these settings:
+
+| Setting | Value |
+|---|---|
+| Source Directory | `backend` |
+| Build Command | `npm ci` |
+| Run Command | `npm start` |
+| HTTP Port | `5000` |
+| Health Check Path | `/health` |
+
+Required backend env vars:
+
+```env
+DATABASE_URL=
+JWT_SECRET=
+SESSION_SECRET=
+DO_SPACES_KEY=
+DO_SPACES_SECRET=
+DO_SPACES_ENDPOINT=
+DO_SPACES_BUCKET=
+DO_SPACES_REGION=
+FRONTEND_URL=
+CLIENT_URL=
+SERVER_URL=
+NODE_ENV=production
+ADMIN_EMAIL=
+ADMIN_PASSWORD=
+```
+
+Optional env vars:
+
+```env
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+DISCORD_CLIENT_ID=
+DISCORD_CLIENT_SECRET=
+DISCORD_WEBHOOK_URL=
+DISCORD_BOT_SECRET=
+UPI_ID=
+UPI_NAME=
+```
+
+An example App Platform spec is available at `.do/app.yaml.example`.
+
+### 4. Frontend on Vercel
+
+Set:
+
+```env
+VITE_API_URL=https://your-digitalocean-backend.ondigitalocean.app/api
+```
+
+Also set the same Vercel domain in backend `FRONTEND_URL` and `CLIENT_URL`. CORS allows only configured frontend origins.
+
+### 5. OAuth Redirect URLs
+
+Use the backend URL for OAuth callbacks:
+
+```text
+https://your-digitalocean-backend.ondigitalocean.app/api/auth/google/callback
+https://your-digitalocean-backend.ondigitalocean.app/api/auth/discord/callback
+```
+
+---
+
 ## Project Structure
 
 ```

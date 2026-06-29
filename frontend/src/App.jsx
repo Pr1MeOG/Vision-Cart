@@ -1190,7 +1190,7 @@ const AdminPanel = ({ user, onClose }) => {
                   <div>
                     <h2 className="admin-section-title">Customer Orders Management</h2>
                     <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-                      {["all", "pending", "paid", "cancelled"].map(s => (
+                      {["all", "pending", "confirmed", "packed", "shipped", "delivered", "cancelled"].map(s => (
                         <button key={s} onClick={() => setStatusFilter(s)} style={{ padding: "7px 16px", borderRadius: 8, fontSize: "0.85rem", fontWeight: 600, background: statusFilter === s ? "var(--grad)" : "rgba(255,255,255,0.06)", color: "var(--text)", border: "none", cursor: "pointer" }}>
                           {s.charAt(0).toUpperCase() + s.slice(1)}{s === "pending" && pendingCount > 0 ? ` (${pendingCount})` : ""}
                         </button>
@@ -1210,8 +1210,8 @@ const AdminPanel = ({ user, onClose }) => {
                               ))}
                             </div>
                             <div style={{ display: "flex", gap: 6, marginTop: 12, flexWrap: "wrap" }}>
-                              {["pending", "paid", "cancelled"].map(s => (
-                                <button key={s} onClick={() => updateOrderStatus(o._id, s)} style={{ padding: "4px 12px", borderRadius: 6, fontSize: "0.78rem", fontWeight: 700, cursor: "pointer", border: "none", background: o.status === s ? (s === "paid" ? "#22c55e" : s === "cancelled" ? "#ef4444" : "var(--grad)") : "rgba(255,255,255,0.08)", color: o.status === s ? "white" : "var(--text-muted)" }}>{s}</button>
+                              {["pending", "confirmed", "packed", "shipped", "delivered", "cancelled"].map(s => (
+                                <button key={s} onClick={() => updateOrderStatus(o._id, s)} style={{ padding: "4px 12px", borderRadius: 6, fontSize: "0.78rem", fontWeight: 700, cursor: "pointer", border: "none", background: o.status === s ? (["confirmed", "packed", "shipped", "delivered"].includes(s) ? "#22c55e" : s === "cancelled" ? "#ef4444" : "var(--grad)") : "rgba(255,255,255,0.08)", color: o.status === s ? "white" : "var(--text-muted)" }}>{s}</button>
                               ))}
                             </div>
                           </div>

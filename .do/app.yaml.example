@@ -1,0 +1,60 @@
+name: visioncart
+region: blr
+
+services:
+  - name: visioncart-api
+    source_dir: backend
+    github:
+      repo: Pr1MeOG/VisionCart-
+      branch: main
+      deploy_on_push: true
+    build_command: npm ci
+    run_command: npm start
+    environment_slug: node-js
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    http_port: 5000
+    health_check:
+      http_path: /health
+    envs:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        type: SECRET
+      - key: JWT_SECRET
+        scope: RUN_TIME
+        type: SECRET
+      - key: SESSION_SECRET
+        scope: RUN_TIME
+        type: SECRET
+      - key: FRONTEND_URL
+        scope: RUN_TIME
+        value: https://your-frontend.vercel.app
+      - key: CLIENT_URL
+        scope: RUN_TIME
+        value: https://your-frontend.vercel.app
+      - key: SERVER_URL
+        scope: RUN_TIME
+        value: https://your-backend.ondigitalocean.app
+      - key: ADMIN_EMAIL
+        scope: RUN_TIME
+        type: SECRET
+      - key: ADMIN_PASSWORD
+        scope: RUN_TIME
+        type: SECRET
+      - key: DO_SPACES_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: DO_SPACES_SECRET
+        scope: RUN_TIME
+        type: SECRET
+      - key: DO_SPACES_ENDPOINT
+        scope: RUN_TIME
+        value: https://nyc3.digitaloceanspaces.com
+      - key: DO_SPACES_BUCKET
+        scope: RUN_TIME
+        value: your-space-name
+      - key: DO_SPACES_REGION
+        scope: RUN_TIME
+        value: nyc3
