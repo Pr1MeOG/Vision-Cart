@@ -29,7 +29,7 @@ export default function AuthPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  const API = import.meta.env.VITE_API_URL || "https://vision-cart.onrender.com/api";
 
   const containerVariants = {
     hidden: {},
