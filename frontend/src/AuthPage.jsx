@@ -19,8 +19,7 @@ export default function AuthPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const API = import.meta.env.VITE_API_URL || "https://vision-cart.onrender.com/api";
-  const AUTH_BASE = import.meta.env.VITE_SERVER_URL || API.replace(/\/api\/?$/, "");
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   const containerVariants = {
     hidden: {},
@@ -40,18 +39,18 @@ export default function AuthPage() {
 
   // OAuth handlers - maintaining existing Google and Discord OAuth
   const oauthGoogle = () => {
-    window.location.href = `${AUTH_BASE}/api/auth/google`;
+    window.location.href = `${API_URL}/api/auth/google`;
   };
 
   const oauthDiscord = () => {
-    window.location.href = `${AUTH_BASE}/api/auth/discord`;
+    window.location.href = `${API_URL}/api/auth/discord`;
   };
 
   const submit = async () => {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`${API}${mode === "login" ? "/auth/login" : "/auth/register"}`, {
+      const res = await fetch(`${API_URL}/api/auth/${mode === "login" ? "login" : "register"}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

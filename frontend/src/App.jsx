@@ -142,18 +142,17 @@ const BackToTop = () => {
   );
 };
 
-const API = import.meta.env.VITE_API_URL || "https://vision-cart.onrender.com/api";
-const API_BASE = API.replace(/\/api\/?$/, "");
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_BASE = API_URL;
 const UPI_ID = import.meta.env.VITE_UPI_ID || "visioncart@upi";
 const UPI_NAME = import.meta.env.VITE_UPI_NAME || "VisionCart Store";
-const AUTH_BASE = import.meta.env.VITE_SERVER_URL || API.replace(/\/api\/?$/, "");
 
 const api = async (path, opts = {}) => {
   const token = localStorage.getItem("vc_token");
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20000);
   try {
-    const res = await fetch(`${API}${path}`, {
+    const res = await fetch(`${API_URL}/api${path}`, {
       headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       credentials: "include",
       signal: controller.signal, ...opts,
@@ -172,7 +171,7 @@ const uploadFile = async (file) => {
   const token = localStorage.getItem("vc_token");
   const formData = new FormData();
   formData.append("file", file);
-  const res = await fetch(`${API}/upload`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, credentials: "include", body: formData });
+  const res = await fetch(`${API_URL}/api/upload`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, credentials: "include", body: formData });
   return res.json();
 };
 
@@ -298,11 +297,11 @@ const AuthModal = ({ onClose, onSuccess }) => {
         <div className="auth-logo"><img src="/banner.gif" alt="VC" style={{ height: 48, borderRadius: 10, margin: "0 auto 10px" }} /><h2>VisionCart Store</h2></div>
         <div className="auth-tabs">{["login", "register"].map(t => <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>{t === "login" ? "Sign In" : "Sign Up"}</button>)}</div>
         <div className="auth-social">
-          <button className="btn-google" onClick={() => window.location.href = `${AUTH_BASE}/api/auth/google`}>
+          <button className="btn-google" onClick={() => window.location.href = `${API_URL}/api/auth/google`}>
             <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#EA4335" d="M5.26 9.77A7.24 7.24 0 0 1 12 4.75c1.73 0 3.29.6 4.52 1.6L19.86 3A11.97 11.97 0 0 0 12 0C7.61 0 3.8 2.36 1.73 5.82l3.53 3.95z"/><path fill="#34A853" d="M16.04 18.01A7.22 7.22 0 0 1 12 19.25c-2.99 0-5.56-1.82-6.74-4.48l-3.53 3.94C3.8 21.63 7.61 24 12 24c2.93 0 5.72-1.02 7.83-2.93l-3.79-3.06z"/><path fill="#FBBC05" d="M19.25 12c0-.69-.1-1.4-.26-2.07H12v4.27h4.07a3.5 3.5 0 0 1-1.53 2.3l3.79 3.06C20.53 17.52 21.5 14.97 19.25 12z" opacity=".9"/><path fill="#4285F4" d="M5.26 14.77A7.35 7.35 0 0 1 4.75 12c0-.96.18-1.89.51-2.77L1.73 5.82A11.95 11.95 0 0 0 0 12c0 1.93.46 3.76 1.26 5.37l4-3.6z"/></svg>
             Continue with Google
           </button>
-          <button className="btn-discord" onClick={() => window.location.href = `${AUTH_BASE}/api/auth/discord`}>
+          <button className="btn-discord" onClick={() => window.location.href = `${API_URL}/api/auth/discord`}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
             Continue with Discord
           </button>

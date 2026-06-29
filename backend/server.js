@@ -36,7 +36,7 @@ app.disable("x-powered-by");
 const DEFAULT_FRONTEND_URL = "https://vision-cart-ivory.vercel.app";
 const DEFAULT_SERVER_URL = "https://vision-cart.onrender.com";
 const FRONTEND_ORIGIN = (process.env.FRONTEND_URL || process.env.CLIENT_URL || DEFAULT_FRONTEND_URL).replace(/\/$/, "");
-const SERVER_ORIGIN = (process.env.SERVER_URL || DEFAULT_SERVER_URL).replace(/\/$/, "");
+const SERVER_ORIGIN = (process.env.BACKEND_URL || process.env.SERVER_URL || DEFAULT_SERVER_URL).replace(/\/$/, "");
 const REQUIRED_ENV = ["MONGO_URI", "JWT_SECRET", "SESSION_SECRET", "ADMIN_EMAIL", "ADMIN_PASSWORD"];
 const missingEnv = REQUIRED_ENV.filter((key) => !process.env[key] || !process.env[key].trim());
 if (missingEnv.length) {
@@ -107,6 +107,9 @@ app.use(helmet({
 app.use(hpp());
 app.use(mongoSanitize());
 const corsOrigins = Array.from(new Set([
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://vision-cart-ivory.vercel.app",
   FRONTEND_ORIGIN,
   ...(process.env.CLIENT_URL || "").split(","),
   ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
